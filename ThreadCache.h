@@ -1,12 +1,9 @@
-#ifndef MR_MALLOC_H
-#define MR_MACLLOC_H
+#ifndef THREADCACHE_H
+#define THREADCACHE_H
 #include<iostream>
 #include<type_traits>
 #include<vector>
 #include "Common.h"
-#define FREELISTSIZE 104 // 自由链表的列表个数
-#define CHUNKNUM 512
-#define MAXSIZE 256 * 1024 // 单次申请的内存大小阈值
 /********************************************
 *  创建时间： 2025 / 05 / 16
 *  名    称： 高性能内存池
@@ -26,8 +23,10 @@ template <class T>
 class MemoryPool {
 public:
 	MemoryPool() {
-		for (int i = 0; i < FREELISTSIZE; i++)
-			_freelists[i] = nullptr;
+		for (size_t i = 0; i < FREELISTSIZE; i++) {
+			MR_MemPoolToolKits::_FreeLists freelists;
+			_freelists[i] = freelists;
+		}
 		_remain = 0;
 		_memstart = nullptr;
 	}
@@ -38,24 +37,28 @@ public:
 		if (mem_size > MAXSIZE)
 			return (T*)malloc(mem_size);
 
+		// 获取实际对齐位数以及预期分配的空间大小
 		size_t algin = MR_MemPoolToolKits::SizeClass<mem_size>::_GetAlginNum();
+		size_t chunk_size = MR_MemPoolToolKits::SizeClass<mem_size>::_RoundUp();
 		size_t pos = get_pos();
 
-		if (_freelists[pos] == nullptr) {
+		if (_freelists[pos].empty()) {
 			// 从chunk_alloc里面拿一大块内存 同时补充_free_lists
-			size_t chunk_size = algin * (pos + 1);
+			// 这里后续可以考虑采用满反馈调节算法
 			size_t num = 128;
 			char* chunk = chunk_alloc(chunk_size, num, algin);
-			for (int i = 0; i < num; i++) {
-				headpush((T*)chunk);
+			for (size_t i = 0; i < num; i++) {
+				_freelists[pos].headpush((T*)chunk);
 				chunk += chunk_size;
 			}
 		}
-		return (T*)headpop(pos);
+		return (T*)_freelists[pos].headpop();
 	}
 
 	void DeAllocate(T* obj) {
-		headpush(obj);
+		obj->~T();
+		size_t pos = get_pos();
+		_freelists[pos].headpush(obj);
 	}
 
 	~MemoryPool() {
@@ -65,46 +68,33 @@ public:
 
 private:
 
-	void* _freelists[FREELISTSIZE];
+	MR_MemPoolToolKits::_FreeLists _freelists[FREELISTSIZE];
 	char* _memstart;
 	size_t _remain;
 	// 记录分配的大块内存起始地址 用于释放
 	std::vector<char*> _startrecord;
-
-	void headpush(T* obj) {
-
-		obj->~T();
-		int pos = get_pos();
-		// 无论是二级还是一级指针本质上就是用
-		// 指针存放某个地址 二级指针解引用是内存块的地址
-		*(void**)obj = _freelists[pos];
-		_freelists[pos] = obj;
-	}
 
 	size_t get_pos() const{
 		constexpr size_t mem_size = MR_MemPoolToolKits::GetSize<T>();
 		return MR_MemPoolToolKits::SizeClass<mem_size>::_GetIndex();
 	}
 
-	void* headpop(size_t pos) {
-		// 取二级指针存放的地址
-		void* next = *(void**)_freelists[pos];
-		// 取二级指针的地址 也就是之前回收可用内存obj地址
-		void* res = _freelists[pos];
-		_freelists[pos] = next;
-		return res;
-	}
-
 	// 重要的块分配函数
+	// 后续会改为PAGE_MEM 且加入慢反馈调节算法
+	// n是请求的单个块大小 
 	char* chunk_alloc(size_t n, size_t& num,size_t algin) {
 		char* res = nullptr;
 		size_t total_chunk = n * num;
+		size_t pos = get_pos();
+		// 剩下的内存完美满足要求
 		if (_remain >= num * n) {
 			res = _memstart;
 			_memstart += total_chunk;
 			_remain -= total_chunk;
 			return res;
 		}
+		// 剩下的内存能满足一个块 但无法满足多个块
+		// 此时返回给上一层调用 且更正num的大小
 		else if (_remain >= n) {
 			num = _remain / n;
 			_remain -= num * n;
@@ -112,25 +102,29 @@ private:
 			_memstart += num * n;
 			return res;
 		}
+		// 一个块也无法满足了 
 		else {
 			size_t chunk = 2 * total_chunk;
-			// 榨干剩余价值
+			// 先榨干剩余价值 将剩下的零碎空间挂载至链表上
 			while (_remain > 0) {
-				int m = _remain / algin - 1;
-				if (m < 0)break;
-				_remain -= algin * (m + 1);
-				*(void**)_memstart = _freelists[m];
-				_freelists[m] = _memstart;
+				int m = _remain - algin;
+				if (m < 0) {
+					// 这部分空间可能还有剩余 但目前先不做处理
+					break;
+				}
+				_remain -= algin;
+				_freelists[pos].headpush(_memstart);
+				_memstart += algin;
 			}
 			_remain = 0;
 			_memstart = (char*)malloc(chunk);
 			// 如果连系统都无法分配了 那就去freelists取可能可用的
 			if (!_memstart) {
 				// 挪动后续的freelists
-				for (size_t i = get_pos() + 1; i < FREELISTSIZE; i++) {
-					if (!_freelists[i]) {
-						_memstart = (char*)headpop(i);
-						_remain += (i + 1) * algin;
+				for (size_t i = pos + 1; i < FREELISTSIZE; i++) {
+					if (!_freelists[i].empty()) {
+						_memstart = (char*)_freelists[i].headpop();
+						_remain += MR_MemPoolToolKits::GetIndexSize(i);
 						// 进入alloc再次去修正num
 						return chunk_alloc(n, num,algin);
 					}
@@ -148,6 +142,6 @@ private:
 	}// chunk_alloc 
 };
 
-#endif // !MR_MALLOC_H
+#endif // ! THREADCHACHE_H
 
 

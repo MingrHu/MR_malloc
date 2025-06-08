@@ -130,11 +130,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MR_malloc.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CentralCache.h" />
     <ClInclude Include="Common.h" />
-    <ClInclude Include="MR_malloc.h" />
+    <ClInclude Include="ThreadCache.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
