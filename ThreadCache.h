@@ -4,6 +4,8 @@
 #include<type_traits>
 #include<vector>
 #include "Common.h"
+#include "CentralCache.h"
+using namespace MR_MemPoolToolKits;
 /********************************************
 *  创建时间： 2025 / 05 / 16
 *  名    称： 高性能内存池
@@ -19,30 +21,50 @@
 *  版    本： 1.1 单线程版本 
 *  改动说明： 
 ********************************************/
+
+class ThreadCache {
+public:
+
+	// 用户请求的内存块大小 size 
+	// 对应的桶位置pos
+	// 有就直接返回 没有再向下一层拿
+	void* Allocate(size_t pos,size_t size);
+
+	// 回收用户的内存块
+	// 过长则返还给下一层
+	void DeAllocate(void* obj, size_t pos);
+
+private:
+
+	// 从中心缓存中获取内存
+	size_t FetchFromCentralCache(void*& start,void*& end,size_t pos, size_t size);
+
+	// 回收链表 返还给下一层
+	void ReleaseFreeNode(size_t pos,size_t num);
+
+	_FreeLists _freelists[FREELISTSIZE];
+};
+
 template <class T>
 class MemoryPool {
 public:
 	MemoryPool() {
-		for (size_t i = 0; i < FREELISTSIZE; i++) {
-			MR_MemPoolToolKits::_FreeLists freelists;
-			_freelists[i] = freelists;
-		}
 		_remain = 0;
 		_memstart = nullptr;
 	}
 
 	T* Allocate() {
 		// 超出单次的最大申请内存阈值
-		constexpr size_t mem_size = MR_MemPoolToolKits::GetSize<T>();
-		if (mem_size > MAXSIZE)
-			return (T*)malloc(mem_size);
+		constexpr size_t _memSize = GetSize<T>();
+		if (_memSize > MAXSIZE)
+			return (T*)malloc(_memSize);
 
 		// 获取实际对齐位数以及预期分配的空间大小
-		size_t algin = MR_MemPoolToolKits::SizeClass<mem_size>::_GetAlginNum();
-		size_t chunk_size = MR_MemPoolToolKits::SizeClass<mem_size>::_RoundUp();
+		size_t algin = SizeClass<_memSize>::_GetAlginNum();
+		size_t chunk_size = SizeClass<_memSize>::_RoundUp();
 		size_t pos = get_pos();
 
-		if (_freelists[pos].empty()) {
+		if (_freelists[pos].Empty()) {
 			// 从chunk_alloc里面拿一大块内存 同时补充_free_lists
 			// 这里后续可以考虑采用满反馈调节算法
 			size_t num = 128;
@@ -55,7 +77,9 @@ public:
 		return (T*)_freelists[pos].headpop();
 	}
 
+
 	void DeAllocate(T* obj) {
+		assert(obj);
 		obj->~T();
 		size_t pos = get_pos();
 		_freelists[pos].headpush(obj);
@@ -68,19 +92,21 @@ public:
 
 private:
 
-	MR_MemPoolToolKits::_FreeLists _freelists[FREELISTSIZE];
+	_FreeLists _freelists[FREELISTSIZE];
 	char* _memstart;
 	size_t _remain;
+	static constexpr size_t _memSize = GetSize<T>();
+
 	// 记录分配的大块内存起始地址 用于释放
 	std::vector<char*> _startrecord;
 
 	size_t get_pos() const{
-		constexpr size_t mem_size = MR_MemPoolToolKits::GetSize<T>();
-		return MR_MemPoolToolKits::SizeClass<mem_size>::_GetIndex();
+		constexpr size_t _memSize = GetSize<T>();
+		return SizeClass<_memSize>::_GetIndex();
 	}
 
 	// 重要的块分配函数
-	// 后续会改为PAGE_MEM 且加入慢反馈调节算法
+	// 后续会改为PAGE_CACHE 且加入慢反馈调节算法
 	// n是请求的单个块大小 
 	char* chunk_alloc(size_t n, size_t& num,size_t algin) {
 		char* res = nullptr;
@@ -122,9 +148,9 @@ private:
 			if (!_memstart) {
 				// 挪动后续的freelists
 				for (size_t i = pos + 1; i < FREELISTSIZE; i++) {
-					if (!_freelists[i].empty()) {
+					if (!_freelists[i].Empty()) {
 						_memstart = (char*)_freelists[i].headpop();
-						_remain += MR_MemPoolToolKits::GetIndexSize(i);
+						_remain += GetIndexSize(i);
 						// 进入alloc再次去修正num
 						return chunk_alloc(n, num,algin);
 					}
