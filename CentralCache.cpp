@@ -4,12 +4,12 @@ void CentralCache::FetchRangeObj(void*& start, void*& end, size_t& num, size_t s
     
     // 加锁
     _SpanLists[pos]._mtx.lock();
-    // 去申请拿span 这个过程涉及到解锁加锁的问题
+    // 去申请拿span 拿到了就直接返回 没拿到就向下层申请
     Span* span = GetOneSpan(_SpanLists[pos], size);
     
     start = span->_freelist.GetListHead();
     span->_freelist.headRangePop(start,end, num);
-    span->_usedcount -= num;
+    span->_usedcount += num;
 
     _SpanLists[pos]._mtx.unlock();
 
@@ -24,9 +24,10 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
         res = res->_next;
     }
     
-    // 后续考虑加锁
+    // 后续考虑解锁问题
     // List._mtx.unlock();
     size_t num = 2; 
+    // 向下层拿span 切分后挂载至spanlist上
     Span* newSpan = PageCache::getInstance()->FetchNewSpan(num);
     newSpan->_usedcount = 0;
     newSpan->_pageID << PAGE_SHIFT;
