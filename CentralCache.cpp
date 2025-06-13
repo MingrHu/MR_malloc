@@ -31,13 +31,24 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
     Span* newSpan = PageCache::getInstance()->FetchNewSpan(num);
     newSpan->_usedcount = 0;
     newSpan->_pageID << PAGE_SHIFT;
+    newSpan->_isUse = true;
+    // reinterpret_cast 等价于（char*) 底层整数转指针
+    char* start = reinterpret_cast<char*>(newSpan->_pageID << PAGE_SHIFT);
+    char* chunk = start;
+    // 开始切分
+    while (chunk < start + (newSpan->_pageNum << PAGE_SHIFT)) {
+        // 需要加入映射关系
+        newSpan->_freelist.headpush(chunk);
+        chunk += size;
+    }
 
-
-    
-
-    
+    List.headPushSpan(newSpan);
+    return newSpan;
 }
 
 void CentralCache::ReleaseListToSpans(void* start, size_t size,size_t pos){
+
+
+
     return;
 }

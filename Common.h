@@ -19,7 +19,7 @@
 #define FREELISTSIZE 104		// 自由链表的列表个数
 #define CHUNKSIZE 1024 * 1024	// 单次申请的最大阈值1MB
 #define MAXSIZE 512				// 单次申请的最大块数
-#define PAGE_SHIFT 13			// 左移的位数 也就是8KB
+#define PAGE_SHIFT 12			// 左移的位数 也就是页大小4KB
 
 namespace MR_MemPoolToolKits {
 
@@ -274,6 +274,7 @@ namespace MR_MemPoolToolKits {
 		PAGE_ID _pageNum = 0;		// 记录分配的页数量
 
 		size_t _usedcount = 0;		// 已经使用的小块内存数量
+		bool _isUse = false;		// 如果这个块已经在CentralCache或者正准备分配给CentralCache 置为true
 
 		_FreeLists _freelist;
 	};
@@ -333,7 +334,7 @@ namespace MR_MemPoolToolKits {
 		}
 
 		// 头出
-		Span* headPop() {
+		Span* headPopSpan() {
 			
 			if (_spHead) {
 				_spHead = _spHead->_next;

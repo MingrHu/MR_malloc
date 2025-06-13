@@ -23,6 +23,7 @@ size_t ThreadCache::FetchFromCentralCache(void*& start,void*& end,size_t pos, si
 	size_t num = CheckSize(size) > _freelists[pos].GetFreq() 
 		? _freelists[pos].GetFreq(): CheckSize(size);
 	CentralCache::getInstance()->FetchRangeObj(start, end, num, size, pos);
+	_freelists[pos].PlusFreq();
 	return num;
 }
 
@@ -32,5 +33,6 @@ void ThreadCache::ReleaseFreeNode(size_t pos, size_t num){
 	void* end = nullptr;
 	_freelists[pos].headRangePop(start, end, num);
 	CentralCache::getInstance()->ReleaseListToSpans(start, num, pos);
+	_freelists[pos].SubFreq();
 
 }

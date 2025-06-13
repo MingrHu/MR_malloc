@@ -13,6 +13,8 @@ public:
 	// num是请求的页个数 根据页个数可以直接找对应的span
 	Span* FetchNewSpan(size_t num);
 
+	Span* GetHashObjwithSpan(void* obj);
+
 private:
 
 	PageCache() = default;
@@ -24,6 +26,8 @@ private:
 	PageCache& operator=(const PageCache&& copy)noexcept = delete;
 
 	static PageCache _PageInstance;
+
+
 
 	std::mutex _pgmtx;
 };
