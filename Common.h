@@ -1,28 +1,44 @@
 #ifndef COMMON_H
 #define COMMON_H
-
-#ifdef _WIN64
-	typedef unsigned long long PAGE_ID;	// 保证平台通用性
-#define MR_LLMAX 9223372036854775807i64
-#elif _WIN32
-	typedef size_t PAGE_ID;
-#define MR_LLMAX 2147483647L
-#endif // !_WIN64
-
+#include<unordered_map> // 后续评价一下性能
 #include <mutex>
 #include <cassert>
 
+// 引入申请系统内存头文件
+// 支持跨平台
+#ifdef _WIN32
+
+	#include <Windows.h>
+
+#else  //...Linux
+
+	#include <sys/mman.h>
+	#include <unistd.h>	
+
+#endif
+
+#ifdef _WIN64
+	typedef unsigned long long PAGE_ID;	// 保证平台通用性
+	#define MR_LLMAX 9223372036854775807i64
+#elif _WIN32
+	typedef size_t PAGE_ID;
+	#define MR_LLMAX 2147483647L
+#endif // !_WIN64
+
 #define BYTES_BASE_SIZE 128		// 后续返回的实际分配大小是该值的倍数
+#define SPAN_MAXNUM 128			// SpanList的长度
 #define BYTES_BASE_ALGN 8		// 基础的对齐位数
 #define LISTSBASEPOS 15			// 链表的前16个基础下标
 #define LISTINTERVAL 8			// 链表后面的下标间隔
-#define FREELISTSIZE 104		// 自由链表的列表个数
-#define CHUNKSIZE 1024 * 1024	// 单次申请的最大阈值1MB
+#define FREELISTSIZE 104		// 链表的长度
+#define CHUNKSIZE 512 * 1024	// 单次申请的最大阈值512KB
 #define MAXSIZE 512				// 单次申请的最大块数
 #define PAGE_SHIFT 12			// 左移的位数 也就是页大小4KB
 
+// 内存池工具集合
 namespace MR_MemPoolToolKits {
 
+	
 	// 辅助计算对齐位数的递归模板
 	template<size_t Size,size_t Base_Size,size_t Algin,bool Done>
 	struct _GetAlginNumHelper {
@@ -92,6 +108,7 @@ namespace MR_MemPoolToolKits {
 		}
 	};
 
+
 	// 转为获取常量表达式类型的对象大小
 	template<typename T>
 	constexpr size_t GetSize() {
@@ -117,6 +134,28 @@ namespace MR_MemPoolToolKits {
 		return CHUNKSIZE / size;
 	}
 
+
+
+	//直接去堆上申请按页申请空间
+	// pagenum是申请的页个数
+	// 左移PAGE_SHIFT是申请8KB * 页数
+	static inline void* SystemAlloc(size_t pagenum) {
+#ifdef _WIN32
+
+		void* ptr = VirtualAlloc(0, pagenum << PAGE_SHIFT, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+#else
+		// linux下brk mmap等
+		void* ptr = mmap(0, kpage << PAGE_SHIFT, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#endif
+		if (ptr == nullptr){
+			printf("apply for system malloc failed！");
+			exit(-1);
+		}
+		return ptr;
+	}
+
+
+
 	// 计时器 用于统计一段时间 
 	// 可用于评估性能
 	class Timer {
@@ -137,8 +176,7 @@ namespace MR_MemPoolToolKits {
 		std::chrono::time_point<std::chrono::high_resolution_clock> _start;
 	};
 
-	
-	
+
 	class _FreeLists {
 	public:
 
@@ -160,7 +198,7 @@ namespace MR_MemPoolToolKits {
 			}
 		}
 
-		// 插入单个结点
+		// 链表头部插入单个结点
 		void headpush(void* back_mem) {
 			// 无论是二级还是一级指针本质上就是用
 			// 指针存放某个地址 二级指针解引用是内存块的地址
@@ -170,11 +208,12 @@ namespace MR_MemPoolToolKits {
 			_size += 1;
 		}
 
-		// 获取单个结点
+		// 获取链表头部单个结点
 		void* headpop() {
 
 			void* res = nullptr;
 			// 取二级指针的地址 也就是之前回收可用内存obj地址
+			assert(_freelist_head);
 			void* next = Next(_freelist_head);
 			res = _freelist_head;
 			_freelist_head = next;
@@ -195,7 +234,7 @@ namespace MR_MemPoolToolKits {
 			_size += num;
 		}
 
-		// 给一个起始点 返回自修正期望num长度的链表
+		// 传入空的起始点和结束点 返回自修正期望num长度的链表
 		// start起始结点 end结束结点 num结点数量
 		void headRangePop(void*& start,void*& end,size_t &num) {
 
@@ -211,6 +250,7 @@ namespace MR_MemPoolToolKits {
 			}
 			num = actnum;
 			_freelist_head = Next(end);
+			Next(end) = nullptr;
 			_size -= num;
 		}
 
@@ -264,19 +304,24 @@ namespace MR_MemPoolToolKits {
 
 	};
 
+
 	// 一个Span对象管理一个或多个页
 	struct Span {
 
-		Span* _prev = nullptr;
-		Span* _next = nullptr;
+		
+		Span* _prev = nullptr;		// 前驱结点
+		
+		
+		Span* _next = nullptr;		// 后继结点		
 
+		
 		PAGE_ID _pageID = 0;		// 记录起始页号
-		PAGE_ID _pageNum = 0;		// 记录分配的页数量
+		PAGE_ID _pageNum = 0;		// 记录分配的页数量			
 
 		size_t _usedcount = 0;		// 已经使用的小块内存数量
 		bool _isUse = false;		// 如果这个块已经在CentralCache或者正准备分配给CentralCache 置为true
 
-		_FreeLists _freelist;
+		_FreeLists _freelist;		// 管理的小块内存链表
 	};
 
 	
@@ -306,10 +351,13 @@ namespace MR_MemPoolToolKits {
 		void Erase(Span* pos) {
 			
 			assert(pos);
-			if (pos->_prev)
-				pos->_prev->_next = pos->_next;
-			else _spHead = pos->_next;
-			delete pos;
+			Span* prev = pos->_prev;
+			Span* next = pos->_next;
+			// 删除的结点只有要么在头要么不在头
+			if (prev)prev->_next = next;
+			else _spHead = next;
+			if (next)next->_prev = prev;
+			pos->_prev = nullptr, pos->_next = nullptr;
 		}
 
 		// 头插
@@ -337,8 +385,11 @@ namespace MR_MemPoolToolKits {
 		Span* headPopSpan() {
 			
 			if (_spHead) {
+				Span* span = _spHead;
 				_spHead = _spHead->_next;
-				return _spHead;
+				if (_spHead)_spHead->_prev = nullptr;
+				span->_next = nullptr;
+				return span;
 			}
 			return nullptr;
 		}
@@ -347,9 +398,13 @@ namespace MR_MemPoolToolKits {
 		Span* popSpan(Span* pos) {
 			
 			assert(pos);
-			if (pos->_prev)
-				pos->_prev->_next = pos->_next;
-			else _spHead = pos->_next;
+			if (pos == _spHead)
+				return headPopSpan();
+			Span* prev = pos->_prev;
+			Span * next = pos->_next;
+			if (prev)prev->_next = next;
+			if (next) next->_prev = prev;
+			pos->_prev = nullptr, pos->_next = nullptr;
 			return pos;
 		}
 
@@ -361,6 +416,149 @@ namespace MR_MemPoolToolKits {
 		
 		Span* _spHead;
 
+	};
+
+	// 定长内存池
+	template <class T>
+	class MemoryPool {
+	public:
+		MemoryPool() {
+			_remain = 0;
+			_memstart = nullptr;
+		}
+
+		T* Allocate() {
+			// 超出单次的最大申请内存阈值
+			constexpr size_t _memSize = GetSize<T>();
+			if (_memSize > MAXSIZE)
+				return (T*)malloc(_memSize);
+
+			// 获取实际对齐位数以及预期分配的空间大小
+			size_t algin = SizeClass<_memSize>::_GetAlginNum();
+			size_t chunk_size = SizeClass<_memSize>::_RoundUp();
+			size_t pos = get_pos();
+
+			if (_freelists[pos].Empty()) {
+				// 从chunk_alloc里面拿一大块内存 同时补充_free_lists
+				size_t num = 128;
+				char* chunk = chunk_alloc(chunk_size, num, algin);
+				for (size_t i = 0; i < num; i++) {
+					_freelists[pos].headpush((T*)chunk);
+					chunk += chunk_size;
+				}
+			}
+			return (T*)_freelists[pos].headpop();
+		}
+
+
+		void DeAllocate(T* obj) {
+			assert(obj);
+			obj->~T();
+			size_t pos = get_pos();
+			_freelists[pos].headpush(obj);
+		}
+
+		~MemoryPool() {
+			for (auto mem : _startrecord)
+				free(mem);
+		}
+
+	private:
+
+		_FreeLists _freelists[FREELISTSIZE];
+		char* _memstart;
+		size_t _remain;
+		static constexpr size_t _memSize = GetSize<T>();
+
+		// 记录分配的大块内存起始地址 用于释放
+		std::vector<char*> _startrecord;
+
+		size_t get_pos() const {
+			constexpr size_t _memSize = GetSize<T>();
+			return SizeClass<_memSize>::_GetIndex();
+		}
+
+		// 重要的块分配函数
+		// n是请求的单个块大小 
+		char* chunk_alloc(size_t n, size_t& num, size_t algin) {
+			char* res = nullptr;
+			size_t total_chunk = n * num;
+			size_t pos = get_pos();
+			// 剩下的内存完美满足要求
+			if (_remain >= num * n) {
+				res = _memstart;
+				_memstart += total_chunk;
+				_remain -= total_chunk;
+				return res;
+			}
+			// 剩下的内存能满足一个块 但无法满足多个块
+			// 此时返回给上一层调用 且更正num的大小
+			else if (_remain >= n) {
+				num = _remain / n;
+				_remain -= num * n;
+				res = _memstart;
+				_memstart += num * n;
+				return res;
+			}
+			// 一个块也无法满足了 
+			else {
+				size_t chunk = 2 * total_chunk;
+				// 先榨干剩余价值 将剩下的零碎空间挂载至链表上
+				while (_remain > 0) {
+					int m = _remain - algin;
+					if (m < 0) {
+						// 这部分空间可能还有剩余 但目前先不做处理
+						break;
+					}
+					_remain -= algin;
+					_freelists[pos].headpush(_memstart);
+					_memstart += algin;
+				}
+				_remain = 0;
+				_memstart = (char*)malloc(chunk);
+				// 如果连系统都无法分配了 那就去freelists取可能可用的
+				if (!_memstart) {
+					// 挪动后续的freelists
+					for (size_t i = pos + 1; i < FREELISTSIZE; i++) {
+						if (!_freelists[i].Empty()) {
+							_memstart = (char*)_freelists[i].headpop();
+							_remain += GetIndexSize(i);
+							// 进入alloc再次去修正num
+							return chunk_alloc(n, num, algin);
+						}
+					}
+					// 如果到这里了 说明malloc也不行 freelist也没有剩余满足要求的内存了
+					// 只能尝试先清理缓存或模拟OOM机制
+					throw std::bad_alloc();
+				}
+				// 记录给指针分配的地址 也即指针本身的地址
+				_startrecord.push_back(_memstart);
+				_remain += chunk;
+				// 此时应该获得了够多的chunk了 但需要返回一个合适的num用于freelists
+				return chunk_alloc(n, num, algin);
+			}
+		}// chunk_alloc 
+	};
+
+
+	// 定长内存池维护的span对象
+	// 仅给pagecache使用
+	class SpanPool {
+	public:
+		// 获取新的span指针对象
+		Span* _spAllocate() {
+			Span* newSpan = _spPool.Allocate();
+			return newSpan;
+		}
+
+		// 回收span指针对象
+		void _spDellocate(Span* back_span) {
+			_spPool.DeAllocate(back_span);
+		}
+
+	private:
+		// 对象池
+		MemoryPool<Span> _spPool;
 	};
 
 }; // namespace MR_MemPoolToolKits

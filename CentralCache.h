@@ -2,6 +2,8 @@
 #define CENTRALCACHE_H
 #include "Common.h"
 using namespace MR_MemPoolToolKits;
+// 中心缓存
+// 单例设计
 class CentralCache {
 public:
 	
