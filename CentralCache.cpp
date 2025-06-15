@@ -1,5 +1,8 @@
 #include "CentralCache.h"
 #include "PageCache.h"
+
+CentralCache CentralCache::_CenInstance;
+
 void CentralCache::FetchRangeObj(void*& start, void*& end, size_t& num, size_t size,size_t pos){
     
     // 加锁
@@ -34,7 +37,6 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
     Span* newSpan = PageCache::getInstance()->FetchNewSpan(num);
     PageCache::getInstance()->_pagemtx.unlock();
     newSpan->_usedcount = 0;
-    newSpan->_pageID << PAGE_SHIFT;
     newSpan->_isUse = true;
 
     // reinterpret_cast 等价于（char*) 底层整数转指针

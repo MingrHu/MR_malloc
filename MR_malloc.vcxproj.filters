@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="BenchMark.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="CentralCache.cpp">
@@ -39,6 +39,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="PageCache.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MR_malloc.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

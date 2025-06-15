@@ -35,6 +35,10 @@ public:
 	// 过长则返还给下一层
 	void DeAllocate(void* obj, size_t pos);
 
+	// 各个线程的内存回收工作
+	// 如果对应线程的ThreadCache销毁 需要还内存
+	~ThreadCache();
+
 private:
 
 	// 从中心缓存中获取内存
@@ -45,7 +49,7 @@ private:
 
 	_FreeLists _freelists[FREELISTSIZE];
 };
-
+static _declspec(thread) ThreadCache tls_threadcache;
 #endif // ! THREADCHACHE_H
 
 

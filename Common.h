@@ -148,12 +148,32 @@ namespace MR_MemPoolToolKits {
 		void* ptr = mmap(0, kpage << PAGE_SHIFT, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #endif
 		if (ptr == nullptr){
-			printf("apply for system malloc failed！");
+			printf("apply for system malloc failed!\n");
 			exit(-1);
 		}
 		return ptr;
 	}
 
+	// 跨平台的内存释放函数
+	// 记录的 pgid 页的起始地址
+	static inline void SystemFree(PAGE_ID pgid) {
+		if (pgid == 0) return;
+		void* ptr = reinterpret_cast<void*>(pgid << PAGE_SHIFT);
+
+#ifdef _WIN32
+		// Windows 下使用 VirtualFree
+		if (!VirtualFree(ptr, 0, MEM_RELEASE)) {
+			printf("Failed to free memory on Windows!\n");
+			exit(-1);
+		}
+#else
+		// Linux/Unix 下使用 munmap
+		if (munmap(ptr, pgid << PAGE_SHIFT) == -1) {
+			printf("Failed to free memory on Linux/Unix!\n");
+			exit(-1);
+		}
+#endif
+	}
 
 
 	// 计时器 用于统计一段时间 
@@ -177,6 +197,9 @@ namespace MR_MemPoolToolKits {
 	};
 
 
+	// 管理小块内存的自由链表
+	// 支持范围链表的插入和删除
+	// 该链表没有内存所有权 析构时无需断开结构
 	class _FreeLists {
 	public:
 
@@ -187,16 +210,9 @@ namespace MR_MemPoolToolKits {
 			_freq = 1;
 		}
 
-		// 防止内存泄露 链表所保存的内存地址要清零 
+		// 链表没有内存所有权 析构时无需管理链表结点
 		// 内存回收工作交给最上层的PAGE_CACHE
-		~_FreeLists() {
-			while (_size) {
-				_size -= 1;
-				void* next = Next(_freelist_head);
-				Next(_freelist_head) = nullptr;
-				_freelist_head = next;
-			}
-		}
+		~_FreeLists()= default;
 
 		// 链表头部插入单个结点
 		void headpush(void* back_mem) {
@@ -238,8 +254,6 @@ namespace MR_MemPoolToolKits {
 		// start起始结点 end结束结点 num结点数量
 		void headRangePop(void*& start,void*& end,size_t &num) {
 
-
-			assert(start);
 			start = _freelist_head;
 			end = start;
 
@@ -306,9 +320,9 @@ namespace MR_MemPoolToolKits {
 
 
 	// 一个Span对象管理一个或多个页
+	// Span所管理的页一定是连续的
 	struct Span {
 
-		
 		Span* _prev = nullptr;		// 前驱结点
 		
 		
@@ -324,24 +338,25 @@ namespace MR_MemPoolToolKits {
 		_FreeLists _freelist;		// 管理的小块内存链表
 	};
 
-	
+	// 管理不同大小的Span的链表
+	// 采用双向链表是为了方便删除和增加结点
+	// 执行的增删改查都是单个span
+	// 该链表没有内存所有权 析构时无需断开结构
 	class SpanList {
 	public:
 		SpanList() {
 			_spHead = nullptr;
 		}
 
-		~SpanList() {
-			while (_spHead) {
-				Erase(_spHead);
-			}
-		}
+		~SpanList() = default;
 
+		// 获取span链表头 
 		Span* Begin() {
 
 			return _spHead;
 		}
 
+		// 获取span链表尾
 		Span* End() {
 
 			return nullptr;
