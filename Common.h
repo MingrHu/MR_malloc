@@ -32,7 +32,7 @@
 #define LISTINTERVAL 8			// 链表后面的下标间隔
 #define FREELISTSIZE 104		// 链表的长度
 #define CHUNKSIZE 512 * 1024	// 单次申请的最大阈值512KB
-#define MAXSIZE 512				// 单次申请的最大块数
+#define MAXSIZE 128				// 单次申请的最大块数
 #define PAGE_SHIFT 12			// 左移的位数 也就是页大小4KB
 
 // 内存池工具集合
@@ -129,7 +129,8 @@ namespace MR_MemPoolToolKits {
 
 	static inline size_t CheckSize(size_t size) {
 
-		if (CHUNKSIZE / size > MAXSIZE)
+		assert(size);
+		if (CHUNKSIZE / size >= MAXSIZE)
 			return MAXSIZE;
 		return CHUNKSIZE / size;
 	}

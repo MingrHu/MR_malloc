@@ -29,7 +29,7 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
 				auto begin1 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
 					v.push_back(malloc(16));
-					// v.puhs_back(malloc(i%256*1024));
+					// v.puhs_back(malloc(i%(256*1024)));
 				}
 				auto end1 = chrono::high_resolution_clock::now();
 
@@ -53,25 +53,25 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
 		t.join();
 	}
 
-	printf("%zu个线程并发执行%zu轮次，每轮次malloc %zu次: 花费：%zu ms\n",
+	printf("系统自带malloc策略：%zu个线程并发执行%zu轮，每轮申请空间 %zu次: 花费：%zu ms\n",
 		nworks, rounds, ntimes, malloc_costtime.load());
 
-	printf("%zu个线程并发执行%zu轮次，每轮次free %zu次: 花费：%zu ms\n",
+	printf("系统自带malloc策略： %zu个线程并发执行%zu轮次，每轮释放空间 %zu次: 花费：%zu ms\n",
 		nworks, rounds, ntimes, free_costtime.load());
 
-	printf("%zu个线程并发malloc&free %zu次，总计花费：%zu ms\n",
+	printf("系统自带malloc策略：%zu个线程并发malloc&free %zu次，总计花费：%zu ms\n",
 		nworks, nworks * rounds * ntimes, malloc_costtime.load() + free_costtime.load());
 }
 
 // ntimes 一轮申请和释放内存的次数
 // rounds 轮次
 // 单轮次申请释放次数 线程数 轮次
-void BenchmarkConcurrentMalloc(size_t ntimes, size_t nworks, size_t rounds)
+void BenchmarkMR_malloc(size_t ntimes, size_t nworks, size_t rounds)
 {
 	std::vector<std::thread> vthread(nworks);
 	std::atomic<size_t> malloc_costtime = 0;
 	std::atomic<size_t> free_costtime = 0;
-	MR_malloc<ListNode> mp;
+	MR_malloc mp;
 
 	for (size_t k = 0; k < nworks; ++k)
 	{
@@ -82,13 +82,15 @@ void BenchmarkConcurrentMalloc(size_t ntimes, size_t nworks, size_t rounds)
 			for (size_t j = 0; j < rounds; ++j) {
 				auto begin1 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
-					v.push_back();
+					v.push_back(malloc(16));
+					//v.push_back(mp.Allocate(i % (256 * 1024)));
 				}
 				auto end1 = chrono::high_resolution_clock::now();
 
 				auto begin2 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
-					free(v[i]);
+					v.push_back(malloc(16));
+					//mp.Dellocate(v[i], i % (257 * 1024));
 				}
 				auto end2 = chrono::high_resolution_clock::now();
 				v.clear();
@@ -107,27 +109,14 @@ void BenchmarkConcurrentMalloc(size_t ntimes, size_t nworks, size_t rounds)
 		t.join();
 	}
 
-	printf("%u个线程并发执行%u轮次，每轮次concurrent alloc %u次: 花费：%u ms\n",
+	printf("采用MR_malloc策略：%u个线程并发执行%u轮，每轮申请空间 %u次: 花费：%u ms\n",
 		nworks, rounds, ntimes, malloc_costtime.load());
 
-	printf("%u个线程并发执行%u轮次，每轮次concurrent dealloc %u次: 花费：%u ms\n",
+	printf("采用MR_malloc策略：%u个线程并发执行%u轮，每轮释放空间 %u次: 花费：%u ms\n",
 		nworks, rounds, ntimes, free_costtime.load());
 
-	printf("%u个线程并发concurrent alloc&dealloc %u次，总计花费：%u ms\n",
+	printf("采用MR_malloc策略：%u个线程并发%u次，总计花费：%u ms\n",
 		nworks, nworks * rounds * ntimes, malloc_costtime.load() + free_costtime.load());
-}
-
-int main()
-{
-	size_t n = 50;
-	cout << "==========================================================" << endl;
-	BenchmarkConcurrentMalloc(n, 4, 10000);
-	cout << endl << endl;
-
-	BenchmarkMalloc(n, 4, 10000);
-	cout << "==========================================================" << endl;
-
-	return 0;
 }
 
 int main() {
@@ -162,12 +151,20 @@ int main() {
 
 #elif 0 // 测试功能块是否正常
 	const size_t Size = 1024 * 256;
-	for (int i = 0; i < 104; i++) 
-		std::cout << MR_MemPoolToolKits::GetIndexSize(i) << std::endl;
+	//for (int i = 1; i <= Size; i++) 
+	std::cout << MR_malloc::_CalRoundUp(256*1024-1).second<< std::endl;
 
-	return 0;
+	
 #elif 1
 
-#endif
+	size_t n = 500;
+	cout << "==========================================================" << endl;
+	BenchmarkMalloc(n, 4, 10000);
 
+	cout << "==========================================================" << endl;
+	BenchmarkMR_malloc(n, 4, 10000);
+	cout << endl << endl;
+
+#endif
+	return 0;
 }
