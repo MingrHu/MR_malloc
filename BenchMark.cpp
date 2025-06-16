@@ -157,13 +157,15 @@ int main() {
 	
 #elif 1
 
-	size_t n = 500;
+	size_t n = 1;
 	cout << "==========================================================" << endl;
-	BenchmarkMalloc(n, 4, 10000);
+	//BenchmarkMalloc(n, 1, 1);
 
 	cout << "==========================================================" << endl;
-	BenchmarkMR_malloc(n, 4, 10000);
-	cout << endl << endl;
+	//BenchmarkMR_malloc(n, 1, 1);
+	MR_malloc mp;
+	void* obj = mp.Allocate(15);
+	mp.Dellocate(obj, 15);
 
 #endif
 	return 0;

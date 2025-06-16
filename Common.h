@@ -337,6 +337,10 @@ namespace MR_MemPoolToolKits {
 		bool _isUse = false;		// 如果这个块已经在CentralCache或者正准备分配给CentralCache 置为true
 
 		_FreeLists _freelist;		// 管理的小块内存链表
+
+		// 默认构造函数
+		Span() : _prev(nullptr), _next(nullptr), _pageID(0),
+			_pageNum(0), _usedcount(0), _isUse(false),_freelist() {}
 	};
 
 	// 管理不同大小的Span的链表
@@ -447,7 +451,7 @@ namespace MR_MemPoolToolKits {
 			// 超出单次的最大申请内存阈值
 			constexpr size_t _memSize = GetSize<T>();
 			if (_memSize > MAXSIZE)
-				return (T*)malloc(_memSize);
+				return (T*)::operator new(_memSize);
 
 			// 获取实际对齐位数以及预期分配的空间大小
 			size_t algin = SizeClass<_memSize>::_GetAlginNum();
@@ -476,7 +480,7 @@ namespace MR_MemPoolToolKits {
 
 		~MemoryPool() {
 			for (auto mem : _startrecord)
-				free(mem);
+				::operator delete(mem);
 		}
 
 	private:
@@ -531,7 +535,7 @@ namespace MR_MemPoolToolKits {
 					_memstart += algin;
 				}
 				_remain = 0;
-				_memstart = (char*)malloc(chunk);
+				_memstart = (char*)::operator new(chunk);
 				// 如果连系统都无法分配了 那就去freelists取可能可用的
 				if (!_memstart) {
 					// 挪动后续的freelists
@@ -563,7 +567,10 @@ namespace MR_MemPoolToolKits {
 	public:
 		// 获取新的span指针对象
 		Span* _spAllocate() {
-			Span* newSpan = _spPool.Allocate();
+			// 未初始化内存
+			Span* newSpanMemory = _spPool.Allocate();
+			Span* newSpan = new (newSpanMemory) Span(); // 调用默认构造函数
+
 			return newSpan;
 		}
 
