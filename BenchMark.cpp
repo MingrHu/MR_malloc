@@ -28,8 +28,8 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
 			for (size_t j = 0; j < rounds; ++j) {
 				auto begin1 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
-					v.push_back(malloc(15));
-					// v.puhs_back(malloc(i%(257*1024)));
+					//v.push_back(malloc(15));
+					v.push_back(malloc(i%(257*1024)));
 				}
 				auto end1 = chrono::high_resolution_clock::now();
 
@@ -82,15 +82,15 @@ void BenchmarkMR_malloc(size_t ntimes, size_t nworks, size_t rounds)
 			for (size_t j = 0; j < rounds; ++j) {
 				auto begin1 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
-					v.push_back(mp.Allocate(15));
-					//v.push_back(mp.Allocate(i % (257 * 1024)));
+					//v.push_back(mp.Allocate(15));
+					v.push_back(mp.Allocate(i % (257 * 1024)));
 				}
 				auto end1 = chrono::high_resolution_clock::now();
 
 				auto begin2 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
-					v.push_back(mp.Allocate(15));
-					//mp.Dellocate(v[i], i % (257 * 1024));
+					//v.push_back(mp.Allocate(15));
+					mp.Dellocate(v[i], i % (257 * 1024));
 				}
 				auto end2 = chrono::high_resolution_clock::now();
 				v.clear();
@@ -157,12 +157,12 @@ int main() {
 	
 #elif 1
 
-	size_t n = 5000;
+	size_t n = 10000;
 	cout << "==========================================================" << endl;
-	BenchmarkMalloc(n, 4, 10000);
+	BenchmarkMalloc(n, 1, 1);
 
 	cout << "==========================================================" << endl;
-	BenchmarkMR_malloc(n, 4, 10000);
+	BenchmarkMR_malloc(n, 1, 1);
 
 #endif
 	return 0;

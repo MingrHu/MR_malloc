@@ -19,7 +19,7 @@
 		}
 
 		static void Dellocate(void* obj,size_t memSize) {
-			assert(obj);
+			if (!obj)return;
 			std::pair<int, int> p = _CalRoundUp(memSize);
 			tls_threadcache->DeAllocate(obj, p.second);
 		}

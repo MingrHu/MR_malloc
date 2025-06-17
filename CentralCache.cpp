@@ -52,7 +52,7 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
     return newSpan;
 }
 
-void CentralCache::ReleaseListToSpans(void* start, size_t size,size_t pos){
+void CentralCache::ReleaseListToSpans(void* start,size_t pos){
 
     _SpanLists[pos]._mtx.lock();
     while (start) {
@@ -61,6 +61,7 @@ void CentralCache::ReleaseListToSpans(void* start, size_t size,size_t pos){
         PageCache::getInstance()->_pagemtx.lock();
         Span* span = PageCache::getInstance()->GetHashObjwithSpan(start);
         PageCache::getInstance()->_pagemtx.unlock();
+        assert(span);
 
         void* next = *(void**)start;
         span->_usedcount -= 1;

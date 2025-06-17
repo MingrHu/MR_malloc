@@ -36,6 +36,7 @@ Span* PageCache::FetchNewSpan(size_t num){
             for (int i = 0; i < newSpan->_pageNum; i++)
                 _pgSpanHash[newSpan->_pageID + i] = newSpan;
 
+            // 
             _pgSpanHash[spright->_pageID] = spright;
             _pgSpanHash[spright->_pageID + spright->_pageNum - 1] = spright;
             _spList[spright->_pageNum - 1].headPushSpan(spright);
@@ -91,7 +92,7 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
 
         _spList[sp->_pageNum - 1].Erase(sp);
         pgnum += sp->_pageNum;
-        start_pgid = sp->_pageID - 1;
+        start_pgid = sp->_pageID - sp->_pageNum;
         // 删除合并后多余的span及映射关系
         _pgSpanHash.erase(sp->_pageID);
         _pgSpanHash.erase(sp->_pageID + sp->_pageNum - 1);

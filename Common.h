@@ -259,7 +259,7 @@ namespace MR_MemPoolToolKits {
 			end = start;
 
 			size_t actnum = 1;
-			while (Next(end) && num - 1) {
+			while (Next(end) && --num) {
 				end = Next(end);
 				actnum += 1;
 			}
