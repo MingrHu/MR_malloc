@@ -38,6 +38,7 @@ void ThreadCache::ReleaseFreeNode(size_t pos, size_t num){
 }
 
 ThreadCache::~ThreadCache(){
+
 	for (size_t i = 0; i < FREELISTSIZE; i++) {
 		if (!_freelists[i].Empty()) {
 			size_t num = _freelists[i].GetRemainSize();

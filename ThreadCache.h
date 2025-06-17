@@ -16,8 +16,7 @@
 #ifndef THREADCACHE_H
 #define THREADCACHE_H
 #include<iostream>
-#include<type_traits>
-#include<vector>
+#include<memory>
 #include "Common.h"
 #include "CentralCache.h"
 using namespace MR_MemPoolToolKits;
@@ -25,6 +24,8 @@ using namespace MR_MemPoolToolKits;
 // 每个线程独享的
 class ThreadCache {
 public:
+
+	ThreadCache() :_freelists() { };
 
 	// 用户请求的内存块大小 size 
 	// 对应的桶位置pos
@@ -49,7 +50,8 @@ private:
 
 	_FreeLists _freelists[FREELISTSIZE];
 };
-static _declspec(thread) ThreadCache tls_threadcache;
+// 采用智能指针自动管理线程局部变量生命周期 自动调用ThreadCache析构
+static _declspec(thread) std::unique_ptr<ThreadCache> tls_threadcache = nullptr;
 #endif // ! THREADCHACHE_H
 
 

@@ -12,15 +12,18 @@
 
 		static void* Allocate(size_t memSize) {
 			if (memSize == 0)return nullptr;
-			std::pair<int, int> p = _CalRoundUp(memSize);			
-			return tls_threadcache.Allocate(p.second, p.first);
+			std::pair<int, int> p = _CalRoundUp(memSize);
+			if (tls_threadcache == nullptr)
+				tls_threadcache = std::make_unique<ThreadCache>();
+			return tls_threadcache->Allocate(p.second, p.first);
 		}
 
 		static void Dellocate(void* obj,size_t memSize) {
 			assert(obj);
 			std::pair<int, int> p = _CalRoundUp(memSize);
-			tls_threadcache.DeAllocate(obj, p.second);
+			tls_threadcache->DeAllocate(obj, p.second);
 		}
+
 #if  PRIVATE
 	private:	
 #endif
@@ -64,7 +67,6 @@
 		static constexpr int _predixSize[12] = { 0,128,256,512,1024,2 * 1024,4 * 1024,8 * 1024,16 * 1024,32 * 1024,64 * 1024,128 * 1024 };
 		
 	};
-
 #elif STATIC
 	// ±‡“Î ±»∑∂®
 	template<typename T>
@@ -85,6 +87,7 @@
 			tls_threadcache.DeAllocate(obj, pos);
 		}
 	};
+
 #endif // DYNAMIC or STATIC
 
 #endif // !MR_MALLOC_H

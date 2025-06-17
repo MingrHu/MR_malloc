@@ -322,19 +322,17 @@ namespace MR_MemPoolToolKits {
 
 	// 一个Span对象管理一个或多个页
 	// Span所管理的页一定是连续的
-	struct Span {
+	class Span {
+	public:
 
-		Span* _prev = nullptr;		// 前驱结点
-		
-		
-		Span* _next = nullptr;		// 后继结点		
+		Span* _prev;		// 前驱结点
+		Span* _next;		// 后继结点		
 
-		
-		PAGE_ID _pageID = 0;		// 记录起始页号
-		PAGE_ID _pageNum = 0;		// 记录分配的页数量			
+		PAGE_ID _pageID;		// 记录起始页号
+		PAGE_ID _pageNum;		// 记录分配的页数量			
 
-		size_t _usedcount = 0;		// 已经使用的小块内存数量
-		bool _isUse = false;		// 如果这个块已经在CentralCache或者正准备分配给CentralCache 置为true
+		size_t _usedcount;		// 已经使用的小块内存数量
+		bool _isUse;		// 如果这个块已经在CentralCache或者正准备分配给CentralCache 置为true
 
 		_FreeLists _freelist;		// 管理的小块内存链表
 

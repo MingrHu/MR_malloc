@@ -28,8 +28,8 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
 			for (size_t j = 0; j < rounds; ++j) {
 				auto begin1 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
-					v.push_back(malloc(16));
-					// v.puhs_back(malloc(i%(256*1024)));
+					v.push_back(malloc(15));
+					// v.puhs_back(malloc(i%(257*1024)));
 				}
 				auto end1 = chrono::high_resolution_clock::now();
 
@@ -56,7 +56,7 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
 	printf("系统自带malloc策略：%zu个线程并发执行%zu轮，每轮申请空间 %zu次: 花费：%zu ms\n",
 		nworks, rounds, ntimes, malloc_costtime.load());
 
-	printf("系统自带malloc策略： %zu个线程并发执行%zu轮次，每轮释放空间 %zu次: 花费：%zu ms\n",
+	printf("系统自带malloc策略：%zu个线程并发执行%zu轮次，每轮释放空间 %zu次: 花费：%zu ms\n",
 		nworks, rounds, ntimes, free_costtime.load());
 
 	printf("系统自带malloc策略：%zu个线程并发malloc&free %zu次，总计花费：%zu ms\n",
@@ -82,14 +82,14 @@ void BenchmarkMR_malloc(size_t ntimes, size_t nworks, size_t rounds)
 			for (size_t j = 0; j < rounds; ++j) {
 				auto begin1 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
-					v.push_back(malloc(16));
-					//v.push_back(mp.Allocate(i % (256 * 1024)));
+					v.push_back(mp.Allocate(15));
+					//v.push_back(mp.Allocate(i % (257 * 1024)));
 				}
 				auto end1 = chrono::high_resolution_clock::now();
 
 				auto begin2 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
-					v.push_back(malloc(16));
+					v.push_back(mp.Allocate(15));
 					//mp.Dellocate(v[i], i % (257 * 1024));
 				}
 				auto end2 = chrono::high_resolution_clock::now();
@@ -157,15 +157,12 @@ int main() {
 	
 #elif 1
 
-	size_t n = 1;
+	size_t n = 5000;
 	cout << "==========================================================" << endl;
-	//BenchmarkMalloc(n, 1, 1);
+	BenchmarkMalloc(n, 4, 10000);
 
 	cout << "==========================================================" << endl;
-	//BenchmarkMR_malloc(n, 1, 1);
-	MR_malloc mp;
-	void* obj = mp.Allocate(15);
-	mp.Dellocate(obj, 15);
+	BenchmarkMR_malloc(n, 4, 10000);
 
 #endif
 	return 0;
