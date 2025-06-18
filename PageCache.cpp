@@ -23,7 +23,7 @@ Span* PageCache::FetchNewSpan(size_t num){
             _pgSpanHash[pgid + i] = newSpan;
         return newSpan;
     }
-    // 当前这个桶没有
+    // 当前这个桶没有 去大于num的桶找
     for (int i = num; i < SPAN_MAXNUM; i++) {
         if (_spList[i].Begin()) {
 
@@ -32,11 +32,11 @@ Span* PageCache::FetchNewSpan(size_t num){
 
             Span* spright = _spPool._spAllocate();
             spright->_pageNum = i - num + 1;
-            spright->_pageID = newSpan->_pageID + spright->_pageNum;
+            spright->_pageID = newSpan->_pageID + num;
             for (int i = 0; i < newSpan->_pageNum; i++)
                 _pgSpanHash[newSpan->_pageID + i] = newSpan;
 
-            // 
+            // 标记一下 方便后续合并
             _pgSpanHash[spright->_pageID] = spright;
             _pgSpanHash[spright->_pageID + spright->_pageNum - 1] = spright;
             _spList[spright->_pageNum - 1].headPushSpan(spright);
@@ -94,8 +94,8 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
         pgnum += sp->_pageNum;
         start_pgid = sp->_pageID - sp->_pageNum;
         // 删除合并后多余的span及映射关系
-        _pgSpanHash.erase(sp->_pageID);
-        _pgSpanHash.erase(sp->_pageID + sp->_pageNum - 1);
+        //_pgSpanHash.erase(sp->_pageID);
+        //_pgSpanHash.erase(sp->_pageID + sp->_pageNum - 1);
         _spPool._spDellocate(sp);
     }
     PAGE_ID end_pgid = pgid + 1;
@@ -114,13 +114,13 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
         pgnum += sp->_pageNum;
         end_pgid = sp->_pageID + sp->_pageNum;
 
-        _pgSpanHash.erase(sp->_pageID);
-        _pgSpanHash.erase(sp->_pageID + sp->_pageNum - 1);
+        //_pgSpanHash.erase(sp->_pageID);
+        //_pgSpanHash.erase(sp->_pageID + sp->_pageNum - 1);
         _spPool._spDellocate(sp);
     }
     // 删除原有映射关系
-    _pgSpanHash.erase(back_span->_pageID);
-    _pgSpanHash.erase(back_span->_pageID + pgnum - 1);
+    //_pgSpanHash.erase(back_span->_pageID);
+    //_pgSpanHash.erase(back_span->_pageID + pgnum - 1);
     // 更新关系并开始合并
     back_span->_pageID = start_pgid;
     back_span->_pageNum = pgnum;

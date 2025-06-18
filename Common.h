@@ -127,6 +127,8 @@ namespace MR_MemPoolToolKits {
 		return algin * rel_pos + (BYTES_BASE_SIZE << ((pos - LISTSBASEPOS - 1) / LISTINTERVAL));
 	}
 
+	// 修正ThreadCache向CentralCache申请的内存块个数
+	// 依据申请的内存块大小size
 	static inline size_t CheckSize(size_t size) {
 
 		assert(size);
@@ -135,6 +137,14 @@ namespace MR_MemPoolToolKits {
 		return CHUNKSIZE / size;
 	}
 
+	// 修正CentralCache向PageCache申请的页数量
+	// 依据申请的内存块大小size
+	static inline size_t CheckPageNum(size_t size) {
+		size_t m = 1;
+		m = max(m, size / (1 << PAGE_SHIFT - 1));
+		m = min(m, max(1, size / 64));
+		return m;
+	}
 
 
 	//直接去堆上申请按页申请空间
@@ -284,7 +294,7 @@ namespace MR_MemPoolToolKits {
 
 		// 获取链表向下层申请小块内存的频次
 		size_t GetFreq() {
-
+			
 			return _freq;
 		}
 

@@ -15,8 +15,9 @@ void ThreadCache::DeAllocate(void* obj, size_t pos){
 
 	// printf("Start to Cycle ThreadCache!");
 	_freelists[pos].headpush(obj);
+	// 回收策略待定
 	if (_freelists[pos].GetRemainSize() > MAXSIZE)
-		ReleaseFreeNode(pos, _freelists[pos].GetRemainSize() - MAXSIZE);
+		ReleaseFreeNode(pos, _freelists[pos].GetRemainSize());
 }
 
 
@@ -25,6 +26,7 @@ size_t ThreadCache::FetchFromCentralCache(void*& start,void*& end,size_t pos, si
 	size_t num = CheckSize(size) > _freelists[pos].GetFreq() 
 		? _freelists[pos].GetFreq(): CheckSize(size);
 	CentralCache::getInstance()->FetchRangeObj(start, end, num, size, pos);
+	// 向下一层要就增加
 	_freelists[pos].PlusFreq();
 	return num;
 }
@@ -35,6 +37,7 @@ void ThreadCache::ReleaseFreeNode(size_t pos, size_t num){
 	void* end = nullptr;
 	_freelists[pos].headRangePop(start, end, num);
 	CentralCache::getInstance()->ReleaseListToSpans(start, pos);
+	// 向下一层还就减少
 	_freelists[pos].SubFreq();
 }
 

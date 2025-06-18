@@ -29,8 +29,8 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
     
     // 后续考虑解锁问题
     // List._mtx.unlock();
-
-    size_t num = CheckSize(size);
+    // 申请的页数修正
+    size_t num = CheckPageNum(size);
     // 向下层拿span 切分后挂载至spanlist上
     // 需要对PageCache进行加锁操作
     PageCache::getInstance()->_pagemtx.lock();

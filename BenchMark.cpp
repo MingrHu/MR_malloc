@@ -151,18 +151,22 @@ int main() {
 
 #elif 0 // 测试功能块是否正常
 	const size_t Size = 1024 * 256;
-	//for (int i = 1; i <= Size; i++) 
-	std::cout << MR_malloc::_CalRoundUp(256*1024-1).second<< std::endl;
-
+	unordered_map<int, int> dic;
+	for (int i = 1; i <= Size; i++) {
+		size_t t = MR_MemPoolToolKits::CheckPageNum(i);
+		dic[t] += 1;
+		std::cout << t << std::endl;
+	}
+	cout << dic.size() << endl;
 	
 #elif 1
 
 	size_t n = 10000;
 	cout << "==========================================================" << endl;
-	BenchmarkMalloc(n, 1, 1);
+	BenchmarkMalloc(n, 4, 2);
 
 	cout << "==========================================================" << endl;
-	BenchmarkMR_malloc(n, 1, 1);
+	BenchmarkMR_malloc(n, 4, 2);
 
 #endif
 	return 0;
