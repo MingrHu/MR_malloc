@@ -216,14 +216,19 @@ namespace MR_MemPoolToolKits {
 
 		// 防止野指针
 		_FreeLists() {
-			_freelist_head = nullptr;
-			_size = 0;
-			_freq = 1;
+			InitFreeLists();
 		}
 
 		// 链表没有内存所有权 析构时无需管理链表结点
 		// 内存回收工作交给最上层的PAGE_CACHE
 		~_FreeLists()= default;
+
+		// 回收的时候需要初始化
+		void InitFreeLists() {
+			_freelist_head = nullptr;
+			_size = 0;
+			_freq = 1;
+		}
 
 		// 链表头部插入单个结点
 		void headpush(void* back_mem) {
@@ -239,7 +244,7 @@ namespace MR_MemPoolToolKits {
 		void* headpop() {
 
 			void* res = nullptr;
-			// 取二级指针的地址 也就是之前回收可用内存obj地址
+			// 取二级指针的地址 
 			assert(_freelist_head);
 			void* next = Next(_freelist_head);
 			res = _freelist_head;
@@ -261,22 +266,20 @@ namespace MR_MemPoolToolKits {
 			_size += num;
 		}
 
-		// 传入空的起始点和结束点 返回自修正期望num长度的链表
-		// start起始结点 end结束结点 num结点数量
-		void headRangePop(void*& start,void*& end,size_t &num) {
-
+		// 传入空的起始点 返回自修正期望num长度的链表
+		// start起始结点 numq期望结点数量
+		void headRangePop(void*& start,void*&end,size_t& num) {
+			
 			start = _freelist_head;
 			end = start;
-
-			size_t actnum = 1;
-			while (Next(end) && --num) {
+			num = min(_size, num);
+			for (size_t i = 0; i < num - 1; i++) {
 				end = Next(end);
-				actnum += 1;
+				assert(end);
 			}
-			num = actnum;
 			_freelist_head = Next(end);
-			Next(end) = nullptr;
 			_size -= num;
+			Next(end) = nullptr;
 		}
 
 		// 获取链表头部 通常用于作为分配
@@ -289,6 +292,7 @@ namespace MR_MemPoolToolKits {
 		// 返回一个左值引用 也方便修改
 		void*& Next(void* obj) {
 
+			assert(obj && "obj cannot be null");
 			return *(void**)obj;
 		}
 
@@ -342,26 +346,32 @@ namespace MR_MemPoolToolKits {
 		PAGE_ID _pageNum;		// 记录分配的页数量			
 
 		size_t _usedcount;		// 已经使用的小块内存数量
+		size_t _sum;		// span管理的内存块总数
 		bool _isUse;		// 如果这个块已经在CentralCache或者正准备分配给CentralCache 置为true
 
 		_FreeLists _freelist;		// 管理的小块内存链表
 
 		// 默认构造函数
 		Span() : _prev(nullptr), _next(nullptr), _pageID(0),
-			_pageNum(0), _usedcount(0), _isUse(false),_freelist() {}
+			_pageNum(0), _usedcount(0), _sum(0), _isUse(false), _freelist() {}
+
+		~Span() {
+			_prev = nullptr, _next = nullptr;
+			_pageID = 0, _pageNum = 0, _usedcount = 0, _sum = 0;
+			_isUse = false;
+		}
 	};
 
 	// 管理不同大小的Span的链表
 	// 采用双向链表是为了方便删除和增加结点
 	// 执行的增删改查都是单个span
-	// 该链表没有内存所有权 析构时无需断开结构
+	// 内存池析构时直接释放内存
 	class SpanList {
 	public:
 		SpanList() {
 			_spHead = nullptr;
 		}
 
-		~SpanList() = default;
 
 		// 获取span链表头 
 		Span* Begin() {
@@ -377,15 +387,19 @@ namespace MR_MemPoolToolKits {
 
 		// 删除指定位置span
 		void Erase(Span* pos) {
-			
+
 			assert(pos);
+
 			Span* prev = pos->_prev;
 			Span* next = pos->_next;
-			// 删除的结点只有要么在头要么不在头
-			if (prev)prev->_next = next;
+
+			// 
+			if (prev) prev->_next = next;
 			else _spHead = next;
-			if (next)next->_prev = prev;
-			pos->_prev = nullptr, pos->_next = nullptr;
+			if (next) next->_prev = prev;
+
+			pos->_prev = nullptr;
+			pos->_next = nullptr;
 		}
 
 		// 头插
@@ -404,8 +418,10 @@ namespace MR_MemPoolToolKits {
 			assert(pos);
 			assert(newSpan);
 			newSpan->_next = pos;
-			if (pos->_prev) 
+			if (pos->_prev) {
 				newSpan->_prev = pos->_prev;
+				pos->_prev->_next = newSpan;
+			}
 			pos->_prev = newSpan;
 		}
 

@@ -158,15 +158,20 @@ int main() {
 		std::cout << t << std::endl;
 	}
 	cout << dic.size() << endl;
+#elif 0
+	MR_malloc mp;
+	void* obj = mp.Allocate(1024);
+	mp.Dellocate(obj, 1024);
+
 	
 #elif 1
 
-	size_t n = 10000;
+	size_t n = 9715;
 	cout << "==========================================================" << endl;
-	BenchmarkMalloc(n, 4, 2);
+	BenchmarkMalloc(n, 8, 15);
 
 	cout << "==========================================================" << endl;
-	BenchmarkMR_malloc(n, 4, 2);
+	BenchmarkMR_malloc(n, 8, 15);
 
 #endif
 	return 0;

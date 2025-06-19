@@ -19,12 +19,13 @@ Span* PageCache::FetchNewSpan(size_t num){
         newSpan = _spList[num - 1].headPopSpan();
         PAGE_ID pgid = newSpan->_pageID;
         PAGE_ID pgnum = newSpan->_pageNum;
+        
         for (int i = 0; i < pgnum; i++)
             _pgSpanHash[pgid + i] = newSpan;
         return newSpan;
     }
     // 当前这个桶没有 去大于num的桶找
-    for (int i = num; i < SPAN_MAXNUM; i++) {
+    for (size_t i = num; i < SPAN_MAXNUM; i++) {
         if (_spList[i].Begin()) {
 
             newSpan = _spList[i].headPopSpan();
@@ -33,7 +34,7 @@ Span* PageCache::FetchNewSpan(size_t num){
             Span* spright = _spPool._spAllocate();
             spright->_pageNum = i - num + 1;
             spright->_pageID = newSpan->_pageID + num;
-            for (int i = 0; i < newSpan->_pageNum; i++)
+            for (size_t i = 0; i < newSpan->_pageNum; i++)
                 _pgSpanHash[newSpan->_pageID + i] = newSpan;
 
             // 标记一下 方便后续合并
@@ -67,7 +68,7 @@ Span* PageCache::GetHashObjwithSpan(void* obj){
 void PageCache::ReleaseSpanToPageCache(Span* back_span){
 
     assert(back_span);
-    PAGE_ID pgid = reinterpret_cast<PAGE_ID>(back_span) >> PAGE_SHIFT;
+    PAGE_ID pgid = back_span->_pageID;
     PAGE_ID pgnum = back_span->_pageNum;
     if (pgnum > SPAN_MAXNUM) {
         SystemFree(pgid);
@@ -80,6 +81,7 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
     PAGE_ID start_pgid = pgid - 1;
     PAGE_ID page_sum = pgnum;
     while (1) {
+        // 向前找必须是在当前的start_pgid上 -1
         if (_pgSpanHash.find(start_pgid) == _pgSpanHash.end()) {
             start_pgid += 1;
             break;
@@ -89,38 +91,34 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
             start_pgid += 1;
             break;
         }
-
+       
         _spList[sp->_pageNum - 1].Erase(sp);
         pgnum += sp->_pageNum;
-        start_pgid = sp->_pageID - sp->_pageNum;
-        // 删除合并后多余的span及映射关系
-        //_pgSpanHash.erase(sp->_pageID);
-        //_pgSpanHash.erase(sp->_pageID + sp->_pageNum - 1);
+        start_pgid = sp->_pageID - 1;
+        
         _spPool._spDellocate(sp);
     }
-    PAGE_ID end_pgid = pgid + 1;
+    // 从当前位置往后找 next_pgid一定是下一个span的起始位置
+    PAGE_ID next_pgid = pgid + back_span->_pageNum;
     // 向后查找
     while (1) {
-        if (_pgSpanHash.find(end_pgid) == _pgSpanHash.end()) {
-            end_pgid -= 1;
+        if (_pgSpanHash.find(next_pgid) == _pgSpanHash.end()) 
             break;
-        }
-        Span* sp = _pgSpanHash[end_pgid];
-        if (sp->_isUse || sp->_pageNum + pgnum > SPAN_MAXNUM) {
-            end_pgid -= 1;
+        Span* sp = _pgSpanHash[next_pgid];
+        if (sp->_isUse || sp->_pageNum + pgnum > SPAN_MAXNUM) 
             break;
-        }
-        _spList[sp->_pageNum - 1].Erase(sp);
+        // 递增
         pgnum += sp->_pageNum;
-        end_pgid = sp->_pageID + sp->_pageNum;
-
-        //_pgSpanHash.erase(sp->_pageID);
-        //_pgSpanHash.erase(sp->_pageID + sp->_pageNum - 1);
+        next_pgid += sp->_pageNum;
+        // 合并前删除链表上的sp结点
+        // 同时回收内存
+        _spList[sp->_pageNum - 1].Erase(sp);
         _spPool._spDellocate(sp);
+        
     }
-    // 删除原有映射关系
-    //_pgSpanHash.erase(back_span->_pageID);
-    //_pgSpanHash.erase(back_span->_pageID + pgnum - 1);
+    // 无需删除原有映射关系 各个Span是相隔的
+    // 主要是因为合并后span两端是整体的
+    // 在后续合并直接从两端出发寻找
     // 更新关系并开始合并
     back_span->_pageID = start_pgid;
     back_span->_pageNum = pgnum;
