@@ -117,7 +117,7 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
         
     }
     // 无需删除原有映射关系 各个Span是相隔的
-    // 主要是因为合并后span两端是整体的
+    // 主要是因为合并后的span是一个整体的
     // 在后续合并直接从两端出发寻找
     // 更新关系并开始合并
     back_span->_pageID = start_pgid;

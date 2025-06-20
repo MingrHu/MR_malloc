@@ -270,13 +270,12 @@ namespace MR_MemPoolToolKits {
 		// start起始结点 numq期望结点数量
 		void headRangePop(void*& start,void*&end,size_t& num) {
 			
+			assert(_freelist_head && "Freelist head nullptr!");
 			start = _freelist_head;
 			end = start;
 			num = min(_size, num);
-			for (size_t i = 0; i < num - 1; i++) {
+			for (size_t i = 0; i < num - 1; i++) 
 				end = Next(end);
-				assert(end);
-			}
 			_freelist_head = Next(end);
 			_size -= num;
 			Next(end) = nullptr;

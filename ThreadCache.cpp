@@ -42,7 +42,7 @@ void ThreadCache::ReleaseFreeNode(size_t pos, size_t num){
 }
 
 ThreadCache::~ThreadCache(){
-	// test
+
 	// printf("Start to Destroy ThreadCache!");
 	for (size_t i = 0; i < FREELISTSIZE; i++) {
 		if (!_freelists[i].Empty()) {

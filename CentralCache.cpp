@@ -42,7 +42,7 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
     PageCache::getInstance()->_pagemtx.unlock();
     
 
-    // reinterpret_cast 等价于（char*) 底层整数转指针
+    // reinterpret_cast 等价于(char*) 底层整数转指针
     char* start = reinterpret_cast<char*>(newSpan->_pageID << PAGE_SHIFT);
     char* chunk = start;
     // 开始切分
