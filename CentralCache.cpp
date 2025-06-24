@@ -6,14 +6,14 @@ CentralCache CentralCache::_CenInstance;
 void CentralCache::FetchRangeObj(void*& start, void*& end, size_t& num, size_t size,size_t pos){
     
     // 加锁
-    _SpanLists[pos]._mtx.lock();
+    _SpanLists[pos]._mtx.Lock();
     // 去申请拿span 拿到了就直接返回 没拿到就向下层申请
     Span* span = GetOneSpan(_SpanLists[pos], size);
     start = span->_freelist.GetListHead();
     span->_freelist.headRangePop(start,end, num);
     span->_usedcount += num;
 
-    _SpanLists[pos]._mtx.unlock();
+    _SpanLists[pos]._mtx.Unlock();
 
 }
 
@@ -35,11 +35,11 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
     // 保证拿到的span被修改为使用状态
     // 否则其余线程可能正在对这个span进行合并
     // 造成这个span的内存块链表被清空
-    PageCache::getInstance()->_pagemtx.lock();
+    PageCache::getInstance()->_pagemtx.Lock();
     Span* newSpan = PageCache::getInstance()->FetchNewSpan(num);
     newSpan->_usedcount = 0;
     newSpan->_isUse = true;     
-    PageCache::getInstance()->_pagemtx.unlock();
+    PageCache::getInstance()->_pagemtx.Unlock();
     
 
     // reinterpret_cast 等价于(char*) 底层整数转指针
@@ -57,13 +57,13 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
 
 void CentralCache::ReleaseListToSpans(void* start,size_t pos){
 
-    _SpanLists[pos]._mtx.lock();
+    _SpanLists[pos]._mtx.Lock();
     while (start) {
         // 根据内存地址得到所属的span对象
         // 由于使用了哈希表 因此线程不安全 要加锁
-        PageCache::getInstance()->_pagemtx.lock();
+        PageCache::getInstance()->_pagemtx.Lock();
         Span* span = PageCache::getInstance()->GetHashObjwithSpan(start);
-        PageCache::getInstance()->_pagemtx.unlock();
+        PageCache::getInstance()->_pagemtx.Unlock();
         assert(span);
 
         void* next = *(void**)start;
@@ -75,13 +75,13 @@ void CentralCache::ReleaseListToSpans(void* start,size_t pos){
             // 释放结点
             _SpanLists[pos].Erase(span);
             span->_freelist.InitFreeLists();
-            PageCache::getInstance()->_pagemtx.lock();
+            PageCache::getInstance()->_pagemtx.Lock();
             span->_isUse = false;
             PageCache::getInstance()->ReleaseSpanToPageCache(span);
-            PageCache::getInstance()->_pagemtx.unlock();
+            PageCache::getInstance()->_pagemtx.Unlock();
         }
         start = next;
     }
 
-    _SpanLists[pos]._mtx.unlock();
+    _SpanLists[pos]._mtx.Unlock();
 }

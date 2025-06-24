@@ -1,9 +1,10 @@
 #ifndef COMMON_H
 #define COMMON_H
 #include<unordered_map> // 后续评价一下性能
-#include <mutex>
+#include <chrono>
 #include <cassert>
-
+#include <atomic>
+#include <thread>
 // 引入申请系统内存头文件
 // 支持跨平台
 #ifdef _WIN32
@@ -34,6 +35,7 @@
 #define CHUNKSIZE 512 * 1024	// 单次申请的最大阈值512KB
 #define MAXSIZE 128				// 单次申请的最大块数
 #define PAGE_SHIFT 12			// 左移的位数 也就是页大小4KB
+#define SPIN_LOCK_MAXTIME 16	// 获取自旋锁的延迟时间
 
 // 内存池工具集合
 namespace MR_MemPoolToolKits {
@@ -205,6 +207,45 @@ namespace MR_MemPoolToolKits {
 
 	private:
 		std::chrono::time_point<std::chrono::high_resolution_clock> _start;
+	};
+
+	class SpinLock {
+	public:
+
+		SpinLock() = default;
+
+		// 获取锁 且如果没获取则当前线程要么sleep等待 要么立即让出CPU
+		void Lock() {
+			retries = 0;
+			// memory_order_acquire 保证后续读操作能看见当前及之前的写操作
+			while (_flag.test_and_set(std::memory_order_acquire)) {
+				backoff();
+				retries++;
+			}
+		}
+
+		void Unlock() {
+			// clear把_flag置为false 使用memory_order_release可以保证
+			// 后续读取的值都是基于修改之后的 让其他线程看到当前修改值
+			_flag.clear(std::memory_order_release);
+		}
+
+	private:
+
+		void backoff() {
+			if (retries < SPIN_LOCK_MAXTIME) {
+				// 让出CPU 和timesleep区别在于避免不必要等待
+				std::this_thread::yield();
+			}
+			else {
+				// 睡眠时长为2的指数幂大小 尝试次数 - 最大时长
+				auto timeInterval = std::chrono::microseconds(1 << (retries - SPIN_LOCK_MAXTIME));
+				std::this_thread::sleep_for(timeInterval);
+			}
+		}
+		// 
+		std::atomic_flag _flag = ATOMIC_FLAG_INIT;
+		int retries = 0;
 	};
 
 
@@ -453,7 +494,7 @@ namespace MR_MemPoolToolKits {
 
 		// 可以考虑后期添加运算符重载
 
-		std::mutex _mtx;		// 桶锁
+		SpinLock _mtx;		// 桶锁
 
 	private:
 		

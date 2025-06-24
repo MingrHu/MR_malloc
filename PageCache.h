@@ -37,7 +37,7 @@ public:
 	void ReleaseSpanToPageCache(Span* back_span);
 
 	// pagecacheÎ¨Ò»µÄËø
-	std::mutex _pagemtx;
+	SpinLock _pagemtx;
 
 private:
 
