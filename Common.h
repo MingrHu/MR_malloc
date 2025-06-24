@@ -35,7 +35,7 @@
 #define CHUNKSIZE 512 * 1024	// 单次申请的最大阈值512KB
 #define MAXSIZE 128				// 单次申请的最大块数
 #define PAGE_SHIFT 12			// 左移的位数 也就是页大小4KB
-#define SPIN_LOCK_MAXTIME 16	// 获取自旋锁的延迟时间
+#define SPIN_LOCK_RETRYTIMES 16	// 低频重试次数上限值 64KB次 
 
 // 内存池工具集合
 namespace MR_MemPoolToolKits {
@@ -233,13 +233,13 @@ namespace MR_MemPoolToolKits {
 	private:
 
 		void backoff() {
-			if (retries < SPIN_LOCK_MAXTIME) {
+			if (retries <( 1<< SPIN_LOCK_RETRYTIMES)) {
 				// 让出CPU 和timesleep区别在于避免不必要等待
 				std::this_thread::yield();
 			}
 			else {
-				// 睡眠时长为2的指数幂大小 尝试次数 - 最大时长
-				auto timeInterval = std::chrono::microseconds(1 << (retries - SPIN_LOCK_MAXTIME));
+				// 随机短时睡眠
+				auto timeInterval = std::chrono::nanoseconds(rand() % (retries - SPIN_LOCK_RETRYTIMES));
 				std::this_thread::sleep_for(timeInterval);
 			}
 		}

@@ -6,6 +6,8 @@
 #include"Common.h"
 #include"MR_malloc.h"
 #define SIZE 10000000
+typedef long long ll;
+int nums[SIZE] = { 0 };
 using namespace std;
 struct ListNode {
 	int val;
@@ -165,8 +167,12 @@ int main() {
 
 	
 #elif 1
-
 	size_t n = 9715;
+	for (int i = 0; i < n; i++) {
+		nums[i] = rand() % i;
+	}
+
+	
 	cout << "==========================================================" << endl;
 	BenchmarkMalloc(n, 8, 15);
 
