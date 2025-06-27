@@ -133,19 +133,34 @@ namespace MR_MemPoolToolKits {
 	// 依据申请的内存块大小size
 	static inline size_t CheckSize(size_t size) {
 
+		// 改为最多一次申请512块小块内存
 		assert(size);
-		if (CHUNKSIZE / size >= MAXSIZE)
-			return MAXSIZE;
+		if (CHUNKSIZE / size >= (MAXSIZE << 2))
+			return MAXSIZE << 2;
 		return CHUNKSIZE / size;
 	}
 
+	// 计算gcd的辅助函数
+	static inline size_t GCD(size_t a, size_t b) {
+
+		assert(a && "in gcd a!=0");
+		assert(b && "in gcd b!=0");
+
+		while (b != 0) {
+			size_t temp = b;
+			b = a % b;
+			a = temp;
+		}
+		return a;
+	}
+
 	// 修正CentralCache向PageCache申请的页数量
-	// 依据申请的内存块大小size
+	// 依据是申请的内存块大小size
 	static inline size_t CheckPageNum(size_t size) {
-		size_t m = 1;
-		m = max(m, size / (1 << PAGE_SHIFT - 1));
-		m = min(m, max(1, size / 64));
-		return m;
+
+		size_t pagesize = 1 << PAGE_SHIFT;
+		size_t pageNum = (size * pagesize) / GCD(size, pagesize) / pagesize;
+		return min(pageNum, MAXSIZE);
 	}
 
 
@@ -233,13 +248,13 @@ namespace MR_MemPoolToolKits {
 	private:
 
 		void backoff() {
-			if (retries <( 1<< SPIN_LOCK_RETRYTIMES)) {
+			if (retries <=( 1<< SPIN_LOCK_RETRYTIMES)) {
 				// 让出CPU 和timesleep区别在于避免不必要等待
 				std::this_thread::yield();
 			}
 			else {
 				// 随机短时睡眠
-				auto timeInterval = std::chrono::nanoseconds(rand() % (retries - SPIN_LOCK_RETRYTIMES));
+				auto timeInterval = std::chrono::nanoseconds(rand() % (retries - (1 <<SPIN_LOCK_RETRYTIMES)));
 				std::this_thread::sleep_for(timeInterval);
 			}
 		}

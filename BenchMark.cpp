@@ -3,11 +3,12 @@
 #include<cstdlib>
 #include<new>
 #include <atomic>
+#include <iomanip> 
+#include <fstream>
 #include"Common.h"
 #include"MR_malloc.h"
 #define SIZE 10000000
 typedef long long ll;
-int nums[SIZE] = { 0 };
 using namespace std;
 struct ListNode {
 	int val;
@@ -16,7 +17,7 @@ struct ListNode {
 
 // ntimes 一轮申请和释放内存的次数
 // rounds 轮次
-void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
+void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds,vector<int>& test) {
 	vector<thread> vthread(nworks);
 	atomic<size_t> malloc_costtime = 0;
 	atomic<size_t> free_costtime = 0;
@@ -31,7 +32,7 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
 				auto begin1 = chrono::high_resolution_clock::now();
 				for (size_t i = 0; i < ntimes; i++) {
 					//v.push_back(malloc(15));
-					v.push_back(malloc(i%(257*1024)));
+					v.push_back(malloc(test[i]));
 				}
 				auto end1 = chrono::high_resolution_clock::now();
 
@@ -68,31 +69,33 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
 // ntimes 一轮申请和释放内存的次数
 // rounds 轮次
 // 单轮次申请释放次数 线程数 轮次
-void BenchmarkMR_malloc(size_t ntimes, size_t nworks, size_t rounds)
+void BenchmarkMR_malloc(size_t ntimes, size_t nworks, size_t rounds, vector<int>& test)
 {
 	std::vector<std::thread> vthread(nworks);
 	std::atomic<size_t> malloc_costtime = 0;
 	std::atomic<size_t> free_costtime = 0;
 	MR_malloc mp;
 
+	// 每条线程
 	for (size_t k = 0; k < nworks; ++k)
 	{
 		vthread[k] = thread([&, k]() {
 			vector<void*> v;
 			v.reserve(ntimes);
-
+			// 每轮
 			for (size_t j = 0; j < rounds; ++j) {
 				auto begin1 = chrono::high_resolution_clock::now();
+				// 每次分配
 				for (size_t i = 0; i < ntimes; i++) {
-					//v.push_back(mp.Allocate(15));
-					v.push_back(mp.Allocate(i % (257 * 1024)));
+
+					v.push_back(mp.Allocate(test[i]));
 				}
 				auto end1 = chrono::high_resolution_clock::now();
 
 				auto begin2 = chrono::high_resolution_clock::now();
+				// 每次释放
 				for (size_t i = 0; i < ntimes; i++) {
-					//v.push_back(mp.Allocate(15));
-					mp.Dellocate(v[i], i % (257 * 1024));
+					mp.Dellocate(v[i], test[i]);
 				}
 				auto end2 = chrono::high_resolution_clock::now();
 				v.clear();
@@ -161,23 +164,46 @@ int main() {
 	}
 	cout << dic.size() << endl;
 #elif 0
+
+	double MAX1 = 0, MAX2 = 0, size1 = 0, size2 = 0, i1 = 0, i2 = 0;
 	MR_malloc mp;
-	void* obj = mp.Allocate(1024);
-	mp.Dellocate(obj, 1024);
+	ofstream outFile("TestReport/memory_wastage_report.txt");
+	if (!outFile) {
+		cerr << "无法打开输出文件！" << endl;
+		return 1;
+	}
+	outFile << "请求大小" << "\t" << "分配大小" << "\t" << "外部碎片率" << "\t" << "内部碎片率" << "\t" << "分配页个数" << endl;
+	for (int i = 1; i <= 256 * 1024; i++) {
+		size_t size = mp._CalRoundUp(i).first;
+		double per1 = ((double)size - (double)i) / (double)size * 100;
+		outFile << i<<"\t" << size << "\t";
+		outFile << fixed << setprecision(2);
+		outFile << per1 << "%" << "\t";
+		size_t pagenum = MR_MemPoolToolKits::CheckPageNum(size);
+		double per2 = ((double)(pagenum * 4096 % size) / (double)(pagenum * 4096)) * 100;
+		outFile << per2 << "%" <<"\t"<<pagenum<< endl;
+		if (MAX1 < per1)
+			MAX1 = per1, size1 = size, i1 = i;
+		if (MAX2 < per2)
+			MAX2 = per2, size2 = size, i2 = i;
+	}
+	cout << "最大外部碎片率为：" << MAX1 << "%" << " 最大内部碎片率为：" << MAX2 << "%" << endl;
+	cout << "对应分配申请大小和实际大小分别为：" << i1 << "-"<<size1<<" " << i2 << "-" << size2<< endl;
+	return 0;
+
 
 	
 #elif 1
-	size_t n = 9715;
-	for (int i = 0; i < n; i++) {
+	size_t n = 256*1024 + 1;
+	vector<int> nums(n, 0);
+	for (int i = 1; i < n; i++) {
 		nums[i] = rand() % i;
 	}
-
-	
 	cout << "==========================================================" << endl;
-	BenchmarkMalloc(n, 8, 15);
+	BenchmarkMalloc(n, 8, 1,nums);
 
 	cout << "==========================================================" << endl;
-	BenchmarkMR_malloc(n, 8, 15);
+	BenchmarkMR_malloc(n, 8, 1,nums);
 
 #endif
 	return 0;
