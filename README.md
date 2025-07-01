@@ -96,7 +96,7 @@ if (tls_threadcache == nullptr)
 
 问题2：
 
-![1751297268469](C:\Users\Hmr\AppData\Roaming\Typora\typora-user-images\1751297268469.png)
+![1751297268469](photo/1751297268469.png)
 
 上述耗时的地方在于加解锁以及判断CentralCache中Span里面是否还有可用内存，锁可改为轻量级的自旋锁，并加入指数退避方法，优化后效率提升x%，加解锁太频繁，可将减少不必要的加解锁，然后将map改为自己设计的基数树，在不影响查询效率的情况下减少了加解锁，因此对ReleaseSpan的提升较多，优化约为y%
 
