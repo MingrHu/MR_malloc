@@ -16,6 +16,7 @@ Span* PageCache::FetchNewSpan(size_t num){
     Span* newSpan = nullptr;
     // 当前这个桶有
     if (_spList[num - 1].Begin()) {
+        // 
         newSpan = _spList[num - 1].headPopSpan();
         PAGE_ID pgid = newSpan->_pageID;
         PAGE_ID pgnum = newSpan->_pageNum;
@@ -60,7 +61,7 @@ Span* PageCache::GetHashObjwithSpan(void* obj){
 
     assert(obj);
     PAGE_ID pgid = reinterpret_cast<PAGE_ID>(obj) >> PAGE_SHIFT;
-    if (_pgSpanHash.find(pgid) != _pgSpanHash.end())
+    if (_pgSpanHash.find(pgid) != nullptr)
         return _pgSpanHash[pgid];
     return nullptr;
 }
@@ -70,6 +71,7 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
     assert(back_span);
     PAGE_ID pgid = back_span->_pageID;
     PAGE_ID pgnum = back_span->_pageNum;
+
     if (pgnum > SPAN_MAXNUM) {
         SystemFree(pgid);
         _spPool._spDellocate(back_span);
@@ -82,7 +84,7 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
     PAGE_ID page_sum = pgnum;
     while (1) {
         // 向前找必须是在当前的start_pgid上 -1
-        if (_pgSpanHash.find(start_pgid) == _pgSpanHash.end()) {
+        if (_pgSpanHash.find(start_pgid) == nullptr) {
             start_pgid += 1;
             break;
         }    
@@ -102,7 +104,7 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
     PAGE_ID next_pgid = pgid + back_span->_pageNum;
     // 向后查找
     while (1) {
-        if (_pgSpanHash.find(next_pgid) == _pgSpanHash.end()) 
+        if (_pgSpanHash.find(next_pgid) == nullptr) 
             break;
         Span* sp = _pgSpanHash[next_pgid];
         if (sp->_isUse || sp->_pageNum + pgnum > SPAN_MAXNUM) 

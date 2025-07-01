@@ -20,12 +20,9 @@ void CentralCache::FetchRangeObj(void*& start, void*& end, size_t& num, size_t s
 
 Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
     
-    Span* res = List.Begin();
-    while (res) {
-        if (res->_freelist.GetRemainSize())
-            return res;
-        res = res->_next;
-    }
+    Span* res = List.getAvaSpan();
+    if (res)
+        return res;
     // 后续考虑解锁问题
     // List._mtx.unlock();
     // 申请的页数修正
@@ -38,7 +35,8 @@ Span* CentralCache::GetOneSpan(SpanList& List, size_t size){
     PageCache::getInstance()->_pagemtx.Lock();
     Span* newSpan = PageCache::getInstance()->FetchNewSpan(num);
     newSpan->_usedcount = 0;
-    newSpan->_isUse = true;     
+    newSpan->_sum = 0;
+    newSpan->_isUse = true;    
     PageCache::getInstance()->_pagemtx.Unlock();
     
 
@@ -61,9 +59,7 @@ void CentralCache::ReleaseListToSpans(void* start,size_t pos){
     while (start) {
         // 根据内存地址得到所属的span对象
         // 由于使用了哈希表 因此线程不安全 要加锁
-        PageCache::getInstance()->_pagemtx.Lock();
         Span* span = PageCache::getInstance()->GetHashObjwithSpan(start);
-        PageCache::getInstance()->_pagemtx.Unlock();
         assert(span);
 
         void* next = *(void**)start;
@@ -72,14 +68,15 @@ void CentralCache::ReleaseListToSpans(void* start,size_t pos){
         // 返还至span进行判断 
         // 如果对应的span里面使用的数量为0 则可以返还至pagecache
         if (span->_usedcount == 0) {
-            // 释放结点
+            // 释放指定的当前结点
             _SpanLists[pos].Erase(span);
-            span->_freelist.InitFreeLists();
+            span->_freelist._ResetFreeList();
             PageCache::getInstance()->_pagemtx.Lock();
             span->_isUse = false;
             PageCache::getInstance()->ReleaseSpanToPageCache(span);
             PageCache::getInstance()->_pagemtx.Unlock();
         }
+        else _SpanLists[pos].insertSpan(span);
         start = next;
     }
 

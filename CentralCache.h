@@ -19,6 +19,7 @@ public:
 	void FetchRangeObj(void*& start, void*& end, size_t& num, size_t size,size_t pos);
 
 	// 从ThreadCache回收部分过长的链表
+	// 回收大小为从start开始至结尾
 	// 如果本层也过长 则返还给下一层
 	void ReleaseListToSpans(void* start, size_t pos);
 	

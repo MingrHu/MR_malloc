@@ -172,7 +172,7 @@ int main() {
 		cerr << "无法打开输出文件！" << endl;
 		return 1;
 	}
-	outFile << "请求大小" << "\t" << "分配大小" << "\t" << "外部碎片率" << "\t" << "内部碎片率" << "\t" << "分配页个数" << endl;
+	outFile << "请求大小" << "\t" << "分配大小" << "\t" << "小块内存碎片率" << "\t" << "页内存内部碎片率" << "\t" << "分配页个数" << endl;
 	for (int i = 1; i <= 256 * 1024; i++) {
 		size_t size = mp._CalRoundUp(i).first;
 		double per1 = ((double)size - (double)i) / (double)size * 100;
@@ -187,23 +187,39 @@ int main() {
 		if (MAX2 < per2)
 			MAX2 = per2, size2 = size, i2 = i;
 	}
-	cout << "最大外部碎片率为：" << MAX1 << "%" << " 最大内部碎片率为：" << MAX2 << "%" << endl;
+	cout << "小块内存最大碎片率为：" << MAX1 << "%" << " 页最大内部碎片率为：" << MAX2 << "%" << endl;
 	cout << "对应分配申请大小和实际大小分别为：" << i1 << "-"<<size1<<" " << i2 << "-" << size2<< endl;
 	return 0;
 
 
-	
+#elif 0
+	Span* newspan = (Span*)malloc(sizeof(Span));
+	PAGE_ID pgid = reinterpret_cast<PAGE_ID>(newspan) >> PAGE_SHIFT;
+	 MR_MemPoolToolKits::RadixTree<64> rt;
+	 cout << "pgid = " << pgid << " newspan =" << newspan << " &newSpan =" << &newspan << endl;
+	 rt[pgid] = newspan;
+	 for (int i = 0; i < 10; i++) {
+		 Span* t = (Span*)malloc(sizeof(Span));
+		 rt[pgid + i] = t;
+		 cout << "rt-size = " << rt.size() << endl;
+	 }
+	 cout << rt.find(pgid) << endl;
+	 rt.clear();
+	 cout << rt[pgid] << " " << rt[pgid + 1] << endl;
+	 cout << "rt-size = " << rt.size() << endl;
+
+
 #elif 1
-	size_t n = 256*1024 + 1;
+	size_t n = 44399;
 	vector<int> nums(n, 0);
 	for (int i = 1; i < n; i++) {
 		nums[i] = rand() % i;
 	}
 	cout << "==========================================================" << endl;
-	BenchmarkMalloc(n, 8, 1,nums);
+	BenchmarkMalloc(n, 8, 10,nums);
 
 	cout << "==========================================================" << endl;
-	BenchmarkMR_malloc(n, 8, 1,nums);
+	BenchmarkMR_malloc(n, 8, 10,nums);
 
 #endif
 	return 0;

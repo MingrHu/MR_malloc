@@ -40,17 +40,3 @@ void ThreadCache::ReleaseFreeNode(size_t pos, size_t num){
 	// 向下一层还就减少
 	_freelists[pos].SubFreq();
 }
-
-ThreadCache::~ThreadCache(){
-
-	// printf("Start to Destroy ThreadCache!");
-	for (size_t i = 0; i < FREELISTSIZE; i++) {
-		if (!_freelists[i].Empty()) {
-			size_t num = _freelists[i].GetRemainSize();
-			void* start = nullptr;
-			void* end = nullptr;
-			_freelists[i].headRangePop(start, end, num);
-			CentralCache::getInstance()->ReleaseListToSpans(start, i);
-		}
-	}
-}

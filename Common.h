@@ -20,10 +20,12 @@
 
 #ifdef _WIN64
 	typedef unsigned long long PAGE_ID;	// 保证平台通用性
-	#define MR_LLMAX 9223372036854775807i64
+	#define MR_SUP 5
+	#define MR_MALLOCBIT 64
 #elif _WIN32
 	typedef size_t PAGE_ID;
-	#define MR_LLMAX 2147483647L
+	#define MR_SUP 7
+	#define MR_MALLOCBIT 32
 #endif // !_WIN64
 
 #define BYTES_BASE_SIZE 128		// 后续返回的实际分配大小是该值的倍数
@@ -266,21 +268,23 @@ namespace MR_MemPoolToolKits {
 
 	// 管理小块内存的自由链表
 	// 支持范围链表的插入和删除
-	// 该链表没有内存所有权 析构时无需断开结构
+	// 该链表没有内存所有权 析构时无需清理内存
 	class _FreeLists {
 	public:
 
 		// 防止野指针
 		_FreeLists() {
-			InitFreeLists();
+			_freelist_head = nullptr;
+			_size = 0;
+			_freq = 1;
 		}
 
-		// 链表没有内存所有权 析构时无需管理链表结点
-		// 内存回收工作交给最上层的PAGE_CACHE
-		~_FreeLists()= default;
 
-		// 回收的时候需要初始化
-		void InitFreeLists() {
+		// 链表没有内存所有权 析构时无需清理内存
+		// 内存回收工作交给最上层的PAGE_CACHE
+		~_FreeLists() = default;
+
+		void _ResetFreeList() {
 			_freelist_head = nullptr;
 			_size = 0;
 			_freq = 1;
@@ -423,9 +427,14 @@ namespace MR_MemPoolToolKits {
 	// 内存池析构时直接释放内存
 	class SpanList {
 	public:
+
 		SpanList() {
+
 			_spHead = nullptr;
 		}
+
+		// 无需管理结点关系
+		~SpanList() = default;
 
 
 		// 获取span链表头 
@@ -467,17 +476,19 @@ namespace MR_MemPoolToolKits {
 			_spHead = newSpan;
 		}
 
-		// 指定位置前插入
-		void insertSpan(Span* pos,Span* newSpan) {
+		// 首先检查span是否在当前链表里面 
+		// 不在的话直接调用headpush头插
+		void insertSpan(Span* span) {
 			
-			assert(pos);
-			assert(newSpan);
-			newSpan->_next = pos;
-			if (pos->_prev) {
-				newSpan->_prev = pos->_prev;
-				pos->_prev->_next = newSpan;
+			assert(span);
+			Span* cur = _spHead;
+			while (cur) {
+				if (cur == span)
+					return;
+				cur = cur->_next;
 			}
-			pos->_prev = newSpan;
+			if (!cur)
+				headPushSpan(span);
 		}
 
 		// 头出
@@ -489,6 +500,18 @@ namespace MR_MemPoolToolKits {
 				if (_spHead)_spHead->_prev = nullptr;
 				span->_next = nullptr;
 				return span;
+			}
+			return nullptr;
+		}
+
+		// 获取一个可用的span
+		// 如果没有则返回nullptr
+		Span* getAvaSpan() {
+
+			while (_spHead) {
+				if (_spHead->_freelist.GetRemainSize())
+					return _spHead;
+				else headPopSpan();
 			}
 			return nullptr;
 		}
@@ -513,7 +536,7 @@ namespace MR_MemPoolToolKits {
 
 	private:
 		
-		Span* _spHead;
+		Span* _spHead;		// 链表头
 
 	};
 
@@ -531,7 +554,6 @@ namespace MR_MemPoolToolKits {
 			constexpr size_t _memSize = GetSize<T>();
 			if (_memSize > MAXSIZE)
 				return (T*)::operator new(_memSize);
-
 			// 获取实际对齐位数以及预期分配的空间大小
 			size_t algin = SizeClass<_memSize>::_GetAlginNum();
 			size_t chunk_size = SizeClass<_memSize>::_RoundUp();
@@ -648,7 +670,7 @@ namespace MR_MemPoolToolKits {
 		Span* _spAllocate() {
 			// 未初始化内存
 			Span* newSpanMemory = _spPool.Allocate();
-			Span* newSpan = new (newSpanMemory) Span(); // 调用默认构造函数
+			Span* newSpan = new (newSpanMemory) Span(); // placement new
 
 			return newSpan;
 		}
@@ -661,6 +683,139 @@ namespace MR_MemPoolToolKits {
 	private:
 		// 对象池
 		MemoryPool<Span> _spPool;
+	};
+
+	// 三层基数树
+	// 64位下BITS = 64 
+	template<size_t BITS>
+	class RadixTree {
+	public:
+
+		RadixTree() {
+			_root = NewNode<_node1>();
+			_rtsize = 0;
+		}
+
+		// 由于结点的内存也来自于内存池
+		// 因此析构无需释放内存 而是由内存池自己析构时释放
+		~RadixTree() = default;
+		
+		void insert(PAGE_ID pgid,Span* span) {
+
+			assert(pgid);
+			PAGE_ID i1 = pgid >> (FIRST_LAYERNUM + LEAF_LAYERNUM);
+			PAGE_ID i2 = (pgid >> LEAF_LAYERNUM) & (FS_MAXLENTH - 1);
+			PAGE_ID i3 = pgid & (LEAF_LENGTH - 1);
+			assert(i1 < FS_MAXLENTH && i2 < FS_MAXLENTH && i3 < LEAF_LENGTH && "Page ID invalid!");
+			set(pgid);
+			if (find(pgid) == nullptr)
+				_rtsize += 1;
+			_root->nodeval[i1]->nodeval[i2]->leafval[i3] = span;
+		}
+
+		void clear() {
+			for (size_t i = 0; i < FS_MAXLENTH; i++) {
+				if (_root->nodeval[i]) {
+					for (size_t j = 0; j < FS_MAXLENTH; j++) {
+						if (_root->nodeval[i]->nodeval[j]) 
+							memset(_root->nodeval[i]->nodeval[j]->leafval, 0, sizeof(Span*) * LEAF_LENGTH);
+					}
+				}
+			}
+			_rtsize = 0;
+		}
+
+		size_t size() {
+			return _rtsize;
+		}
+
+		const Span* find(PAGE_ID pgid)const {
+			
+			assert(pgid);
+			PAGE_ID i1 = pgid >> (FIRST_LAYERNUM + LEAF_LAYERNUM);
+			PAGE_ID i2 = (pgid >> LEAF_LAYERNUM) & (FS_MAXLENTH - 1);
+			PAGE_ID i3 = pgid & (LEAF_LENGTH - 1);
+			if (_root->nodeval[i1] == nullptr || _root->nodeval[i1]->nodeval[i2] == nullptr)
+				return nullptr;
+			return _root->nodeval[i1]->nodeval[i2]->leafval[i3];
+		}
+
+		Span*& operator[](PAGE_ID pgid) {
+
+			assert(pgid);  
+			set(pgid);    
+			PAGE_ID i1 = pgid >> (FIRST_LAYERNUM + LEAF_LAYERNUM);
+			PAGE_ID i2 = (pgid >> LEAF_LAYERNUM) & (FS_MAXLENTH - 1);
+			PAGE_ID i3 = pgid & (LEAF_LENGTH - 1);
+			if (find(pgid) == nullptr)
+				_rtsize += 1;
+			return _root->nodeval[i1]->nodeval[i2]->leafval[i3];
+		}
+
+	private:
+
+		static const size_t FIRST_LAYERNUM = (BITS - PAGE_SHIFT + MR_SUP) / 3; // 前两层各19位
+		static const size_t FS_MAXLENTH = 1 << FIRST_LAYERNUM;		// 前两层元素元素个数
+		static const size_t LEAF_LAYERNUM = BITS - PAGE_SHIFT - 2 * FIRST_LAYERNUM;	// 第三层位数14位
+		static const size_t LEAF_LENGTH = 1 << LEAF_LAYERNUM;		// 第三层元素个数
+		size_t _rtsize;		// 基数树包含的元素个数
+
+		class _leaf {
+		public:
+			_leaf() {
+				for (int i = 0; i < LEAF_LENGTH; i++)
+					leafval[i] = nullptr;
+			}
+
+			Span* leafval[LEAF_LENGTH]; // 64位下为128KB
+		};
+
+		class _node2 {
+		public:
+			_node2() {
+				for (int i = 0; i < FS_MAXLENTH; i++)
+					nodeval[i] = nullptr;
+			}
+
+			_leaf* nodeval[FS_MAXLENTH]; // 64位下为4MB
+		};
+
+		class _node1 {
+		public:
+			_node1() {
+				for (int i = 0; i < FS_MAXLENTH; i++)
+					nodeval[i] = nullptr;
+			}
+
+			_node2* nodeval[FS_MAXLENTH]; // 64位下为4MB
+		};
+
+		_node1* _root;		// 基数树的头
+
+		// 为结点开空间
+		template<typename T>
+		T* NewNode() {
+			static MemoryPool<T> _mp;
+			void* mem = _mp.Allocate();
+			assert(mem);
+			return new(mem) T();
+		}
+
+		// pgid = BITS>>PAGE_SHIFT
+		void set(PAGE_ID pgid) {
+
+			PAGE_ID i1 = pgid >> (FIRST_LAYERNUM + LEAF_LAYERNUM);
+			PAGE_ID i2 = (pgid >> LEAF_LAYERNUM) & (FS_MAXLENTH - 1);
+			PAGE_ID i3 = pgid & (LEAF_LENGTH - 1);
+			if (_root->nodeval[i1] == nullptr) {
+				_root->nodeval[i1] = NewNode<_node2>();
+				assert(_root->nodeval[i1]);
+			}
+			if (_root->nodeval[i1]->nodeval[i2] == nullptr) {
+				_root->nodeval[i1]->nodeval[i2] = NewNode<_leaf>();
+				assert(_root->nodeval[i1]->nodeval[i2]);
+			}
+		}
 	};
 
 }; // namespace MR_MemPoolToolKits
