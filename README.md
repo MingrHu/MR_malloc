@@ -1,3 +1,7 @@
+---
+typora-copy-images-to: photo
+---
+
 ## MR_malloc内存池项目
 
 ### 项目介绍：终版
@@ -76,7 +80,7 @@ if (tls_threadcache == nullptr)
 
 这里注意，**CentralCache向PageCache申请Span的时候需要和你申请的小块内存块进行一个最小公倍数计算**，例如你申请的实际内存是9KB，但page一页是4KB，如果你申请的Span是管理3页的，那你对应的Span大小为12KB，虽然能满足本次小块内存申请要求，但会造成内部内存碎片，也就是这剩下的12 - 9 = 3KB就被浪费掉了，而外部内存碎片由于内存池的管理，释放了就还回来，不存在释放了的内存无法使用，因此外部内存碎片被很好的解决了，经过测试，内部Span页内存碎片率采用这种方式可降低到0%
 
-![1751382062504](C:\Users\Hmr\AppData\Roaming\Typora\typora-user-images\1751382062504.png)
+![1751382062504](./photo/1751382062504.png)
 
 略
 
@@ -121,21 +125,21 @@ BenchmarkMR_malloc(n, 8, 5,nums);
 
 debug情况下：
 
-![1751382227748](C:\Users\Hmr\AppData\Roaming\Typora\typora-user-images\1751382227748.png)
+![1751382227748](./photo/1751382227748.png)
 
 release情况下：
 
-![1751379121844](C:\Users\Hmr\AppData\Roaming\Typora\typora-user-images\1751379121844.png)
+![1751379121844](./photo/1751379121844.png)
 
 本项目：
 
-![1751383107672](C:\Users\Hmr\AppData\Roaming\Typora\typora-user-images\1751383107672.png)
+![1751383107672](./photo/1751383107672.png)
 
 其余博主：
 
 知乎：https://zhuanlan.zhihu.com/p/709945576
 
-![1751382799385](C:\Users\Hmr\AppData\Roaming\Typora\typora-user-images\1751382799385.png)
+![1751382799385](./photo/1751382799385.png)
 
 申请速度提高了好几倍，相比于初版，即使是现在的n = 256*1024 + 1，效果也非常好，与网上常见的其余博主的内存池项目相比，本项目性能较佳，但在某些情况下，例如线程竞争激烈、申请释放的内存总并发较大情况下，可能会因为自旋锁的指数退避策略导致性能和系统malloc接近，这方面还需要诸多的测试来不断修正优化内存池
 
