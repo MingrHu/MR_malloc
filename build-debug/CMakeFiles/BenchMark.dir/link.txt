@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -Wall -Wextra -Werror -O0 -ggdb -fsanitize=address CMakeFiles/BenchMark.dir/src/BenchMark.cpp.o -o bin/BenchMark  libmr_malloc_lib.a 

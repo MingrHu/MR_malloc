@@ -1,2 +1,0 @@
-/usr/bin/ar qc libmr_malloc_lib.a CMakeFiles/mr_malloc_lib.dir/src/ThreadCache.cpp.o CMakeFiles/mr_malloc_lib.dir/src/CentralCache.cpp.o CMakeFiles/mr_malloc_lib.dir/src/PageCache.cpp.o
-/usr/bin/ranlib libmr_malloc_lib.a
