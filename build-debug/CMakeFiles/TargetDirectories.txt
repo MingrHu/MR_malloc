@@ -1,4 +1,0 @@
-/home/hmr/MR_malloc/build-debug/CMakeFiles/mr_malloc_lib.dir
-/home/hmr/MR_malloc/build-debug/CMakeFiles/BenchMark.dir
-/home/hmr/MR_malloc/build-debug/CMakeFiles/edit_cache.dir
-/home/hmr/MR_malloc/build-debug/CMakeFiles/rebuild_cache.dir
