@@ -20,6 +20,19 @@ typora-copy-images-to: photo
 
 **本项目主要功能是为了给频繁请求和释放内存的线程提供更高效的操作，主要原理是缓存了内存 且对申请的块按一定规则进行内存对齐，从而减少了内存外碎片的产生，在内存池的设计上，从对齐位数设计到内内存碎片率优化降低设计以及很多细节之处不一一展开，代码部分都有必要的注释，后续本人有时间再来详细写一下 **
 
+### 项目构建方式
+```bash
+mkdir build-debug && cd build-debug
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j$(nproc)
+./bin/BenchMark
+
+mkdir build-release && cd build-release
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+./bin/BenchMark
+```
+
 ### 一、项目设计思路
 
 ##### 1.项目架构

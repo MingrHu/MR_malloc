@@ -2,8 +2,8 @@
 #define PAGECACHE_H
 #include"Common.h"
 using namespace MR_MemPoolToolKits;
-// Ò³»º´æ
-// µ¥ÀıÉè¼Æ
+// é¡µç¼“å­˜
+// å•ä¾‹è®¾è®¡
 class PageCache {
 public:
 
@@ -11,17 +11,17 @@ public:
 		return &_PageInstance;
 	}
 
-	// numÊÇÇëÇóµÄÒ³¸öÊı ¸ù¾İÒ³¸öÊı¿ÉÒÔÖ±½ÓÕÒ¶ÔÓ¦µÄspan
+	// numæ˜¯è¯·æ±‚çš„é¡µä¸ªæ•° æ ¹æ®é¡µä¸ªæ•°å¯ä»¥ç›´æ¥æ‰¾å¯¹åº”çš„span
 	Span* FetchNewSpan(size_t num);
 
-	// »ñÈ¡µØÖ·Ò³ºÅºÍspan*µÄ¶ÔÓ¦¹ØÏµ
+	// è·å–åœ°å€é¡µå·å’Œspan*çš„å¯¹åº”å…³ç³»
 	Span* GetHashObjwithSpan(void* obj);
 
-	// ·µ»¹À´×ÔThreadCacheµÄspanÖÁpagecache
-	// ÓÅÏÈ°ÑÁãËéµÄ×éÖ¯ÆğÀ´³É´óµÄspan
+	// è¿”è¿˜æ¥è‡ªThreadCacheçš„spanè‡³pagecache
+	// ä¼˜å…ˆæŠŠé›¶ç¢çš„ç»„ç»‡èµ·æ¥æˆå¤§çš„span
 	void ReleaseSpanToPageCache(Span* back_span);
 
-	// pagecacheÎ¨Ò»µÄËø
+	// pagecacheå”¯ä¸€çš„é”
 	SpinLock _pagemtx;
 
 private:
@@ -34,16 +34,16 @@ private:
 	PageCache(const PageCache&& copy)noexcept = delete;
 	PageCache& operator=(const PageCache&& copy)noexcept = delete;
 
-	// Î¨Ò»È«¾ÖPageCacheÊµÀı
+	// å”¯ä¸€å…¨å±€PageCacheå®ä¾‹
 	static PageCache _PageInstance;
 
-	// ¹ÜÀíSpanµÄÁ´±í
+	// ç®¡ç†Spançš„é“¾è¡¨
 	SpanList _spList[SPAN_MAXNUM];
 
-	// Span¶ÔÏó³Ø ·½±ãÖ±½Ó»ñÈ¡³õÊ¼µÄSpan
+	// Spanå¯¹è±¡æ±  æ–¹ä¾¿ç›´æ¥è·å–åˆå§‹çš„Span
 	SpanPool _spPool;
 
-	// Ò³ºÅºÍspan*µÄÓ³Éä
+	// é¡µå·å’Œspan*çš„æ˜ å°„
 	RadixTree<MR_MALLOCBIT> _pgSpanHash;
 };
 

@@ -2,25 +2,25 @@
 #define CENTRALCACHE_H
 #include "Common.h"
 using namespace MR_MemPoolToolKits;
-// ÖĞĞÄ»º´æ
-// µ¥ÀıÉè¼Æ
+// ä¸­å¿ƒç¼“å­˜
+// å•ä¾‹è®¾è®¡
 class CentralCache {
 public:
 	
-	// µ¥ÀıµÄÎ¨Ò»È«¾ÖÈë¿Úµã
+	// å•ä¾‹çš„å”¯ä¸€å…¨å±€å…¥å£ç‚¹
 	static CentralCache* getInstance() {
 		return &_CenInstance;
 	}
 
-	// ThreadCacheÄÃÄÚ´æ¿é
-	// size Ö¸¶¨´óĞ¡µÄÄÚ´æ¿é
-	// ÓĞ¾ÍÖ±½Ó·µ»Ø Ã»ÓĞÔÙÏòÏÂÄÃ
-	// Õâ¸öÊÇ¸÷¸öÏß³Ì½øĞĞµÄ ¶ÔÓ¦µÄÍ°ĞèÒª¼ÓËø
+	// ThreadCacheæ‹¿å†…å­˜å—
+	// size æŒ‡å®šå¤§å°çš„å†…å­˜å—
+	// æœ‰å°±ç›´æ¥è¿”å› æ²¡æœ‰å†å‘ä¸‹æ‹¿
+	// è¿™ä¸ªæ˜¯å„ä¸ªçº¿ç¨‹è¿›è¡Œçš„ å¯¹åº”çš„æ¡¶éœ€è¦åŠ é”
 	void FetchRangeObj(void*& start, void*& end, size_t& num, size_t size,size_t pos);
 
-	// ´ÓThreadCache»ØÊÕ²¿·Ö¹ı³¤µÄÁ´±í
-	// »ØÊÕ´óĞ¡Îª´Óstart¿ªÊ¼ÖÁ½áÎ²
-	// Èç¹û±¾²ãÒ²¹ı³¤ Ôò·µ»¹¸øÏÂÒ»²ã
+	// ä»ThreadCacheå›æ”¶éƒ¨åˆ†è¿‡é•¿çš„é“¾è¡¨
+	// å›æ”¶å¤§å°ä¸ºä»startå¼€å§‹è‡³ç»“å°¾
+	// å¦‚æœæœ¬å±‚ä¹Ÿè¿‡é•¿ åˆ™è¿”è¿˜ç»™ä¸‹ä¸€å±‚
 	void ReleaseListToSpans(void* start, size_t pos);
 	
 
@@ -28,17 +28,17 @@ private:
 
 	CentralCache() = default;
 	
-	// ½ûÓÃ¿½±´¹¹Ôì ¸³ÖµÔËËã
+	// ç¦ç”¨æ‹·è´æ„é€  èµ‹å€¼è¿ç®—
 	CentralCache(const CentralCache& copy)noexcept = delete;
 	CentralCache& operator=(const CentralCache& copy)noexcept = delete;
-	// ½ûÓÃÒÆ¶¯Ïà¹Ø²Ù×÷
+	// ç¦ç”¨ç§»åŠ¨ç›¸å…³æ“ä½œ
 	CentralCache(const CentralCache&& copy)noexcept = delete;
 	CentralCache& operator=(const CentralCache&& copy)noexcept = delete;
 
-	// »ñÈ¡Ò»¸ö¿ÉÓÃµÄspan¸øÉÏ²ãµÄThreadCache
-	// Èç¹ûÃ»ÓĞÔòÏòÏÂÔÙÉêÇëspan È»ºó°´size»®·Ö
-	// ÄÃµ½spanºóĞèÒªÉÏ²ã×Ô¼ºÈ¥ÄÃspanÀïÃæµÄÄÚ´æ¿é
-	// ListÊÇÖ¸¶¨µÄÍ°Î»ÖÃ sizeÊÇ»®·ÖµÄ´óĞ¡
+	// è·å–ä¸€ä¸ªå¯ç”¨çš„spanç»™ä¸Šå±‚çš„ThreadCache
+	// å¦‚æœæ²¡æœ‰åˆ™å‘ä¸‹å†ç”³è¯·span ç„¶åæŒ‰sizeåˆ’åˆ†
+	// æ‹¿åˆ°spanåéœ€è¦ä¸Šå±‚è‡ªå·±å»æ‹¿spané‡Œé¢çš„å†…å­˜å—
+	// Listæ˜¯æŒ‡å®šçš„æ¡¶ä½ç½® sizeæ˜¯åˆ’åˆ†çš„å¤§å°
 	Span* GetOneSpan(SpanList& List, size_t size);
 
 	static CentralCache _CenInstance;

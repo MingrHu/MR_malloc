@@ -1,4 +1,4 @@
-#include "PageCache.h"
+#include "include/PageCache.h"
 
 PageCache PageCache::_PageInstance;
 
@@ -9,23 +9,23 @@ Span* PageCache::FetchNewSpan(size_t num){
         Span* res = _spPool._spAllocate();
         res->_pageID = reinterpret_cast<PAGE_ID>(pgmem_start) >> PAGE_SHIFT;
         res->_pageNum = num;
-        for (int i = 0; i < num; i++)
+        for (size_t i = 0; i < num; i++)
             _pgSpanHash[res->_pageID + i] = res;
     }
-    // ¸ø¿ÉÄÜÕÒµ½µÄspan×¼±¸
+    // ç»™å¯èƒ½æ‰¾åˆ°çš„spanå‡†å¤‡
     Span* newSpan = nullptr;
-    // µ±Ç°Õâ¸öÍ°ÓĞ
+    // å½“å‰è¿™ä¸ªæ¡¶æœ‰
     if (_spList[num - 1].Begin()) {
         // 
         newSpan = _spList[num - 1].headPopSpan();
         PAGE_ID pgid = newSpan->_pageID;
         PAGE_ID pgnum = newSpan->_pageNum;
         
-        for (int i = 0; i < pgnum; i++)
+        for (size_t i = 0; i < pgnum; i++)
             _pgSpanHash[pgid + i] = newSpan;
         return newSpan;
     }
-    // µ±Ç°Õâ¸öÍ°Ã»ÓĞ È¥´óÓÚnumµÄÍ°ÕÒ
+    // å½“å‰è¿™ä¸ªæ¡¶æ²¡æœ‰ å»å¤§äºnumçš„æ¡¶æ‰¾
     for (size_t i = num; i < SPAN_MAXNUM; i++) {
         if (_spList[i].Begin()) {
 
@@ -38,18 +38,18 @@ Span* PageCache::FetchNewSpan(size_t num){
             for (size_t i = 0; i < newSpan->_pageNum; i++)
                 _pgSpanHash[newSpan->_pageID + i] = newSpan;
 
-            // ±ê¼ÇÒ»ÏÂ ·½±ãºóĞøºÏ²¢
+            // æ ‡è®°ä¸€ä¸‹ æ–¹ä¾¿åç»­åˆå¹¶
             _pgSpanHash[spright->_pageID] = spright;
             _pgSpanHash[spright->_pageID + spright->_pageNum - 1] = spright;
             _spList[spright->_pageNum - 1].headPushSpan(spright);
             return newSpan;
         }
     }
-    // ÕÒµ½ÕâËµÃ÷Ã»ÓĞÍ°Âú×ãÇëÇóµÄnumÒ³¸öÊı
-    // ±ØĞë×Ô¼º¿ª±Ù¿Õ¼äÁË
+    // æ‰¾åˆ°è¿™è¯´æ˜æ²¡æœ‰æ¡¶æ»¡è¶³è¯·æ±‚çš„numé¡µä¸ªæ•°
+    // å¿…é¡»è‡ªå·±å¼€è¾Ÿç©ºé—´äº†
     Span* res = _spPool._spAllocate();
     void* pgmem_start = SystemAlloc(SPAN_MAXNUM);
-    // »ñÈ¡ÆğÊ¼Ò³ºÅ
+    // è·å–èµ·å§‹é¡µå·
     res->_pageID = reinterpret_cast<PAGE_ID>(pgmem_start) >> PAGE_SHIFT;
     res->_pageNum = SPAN_MAXNUM;
     _spList[SPAN_MAXNUM - 1].headPushSpan(res);
@@ -77,13 +77,12 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
         _spPool._spDellocate(back_span);
         return;
     }
-    // ¿ªÊ¼½ÓÊÖ¹ÜÀíspanlistÁ´±íºÏ²¢²Ù×÷
-    // ·ÖÎªÏòÇ°ÕÒÒ³ºÍÏòºóÕÒÒ³
-    // ÕÒµ½µÄÒ³±ØĞëÊÇÒ»¸öspan¹ÜÀíµÄ
+    // å¼€å§‹æ¥æ‰‹ç®¡ç†spanlisté“¾è¡¨åˆå¹¶æ“ä½œ
+    // åˆ†ä¸ºå‘å‰æ‰¾é¡µå’Œå‘åæ‰¾é¡µ
+    // æ‰¾åˆ°çš„é¡µå¿…é¡»æ˜¯ä¸€ä¸ªspanç®¡ç†çš„
     PAGE_ID start_pgid = pgid - 1;
-    PAGE_ID page_sum = pgnum;
     while (1) {
-        // ÏòÇ°ÕÒ±ØĞëÊÇÔÚµ±Ç°µÄstart_pgidÉÏ -1
+        // å‘å‰æ‰¾å¿…é¡»æ˜¯åœ¨å½“å‰çš„start_pgidä¸Š -1
         if (_pgSpanHash.find(start_pgid) == nullptr) {
             start_pgid += 1;
             break;
@@ -100,28 +99,28 @@ void PageCache::ReleaseSpanToPageCache(Span* back_span){
         
         _spPool._spDellocate(sp);
     }
-    // ´Óµ±Ç°Î»ÖÃÍùºóÕÒ next_pgidÒ»¶¨ÊÇÏÂÒ»¸öspanµÄÆğÊ¼Î»ÖÃ
+    // ä»å½“å‰ä½ç½®å¾€åæ‰¾ next_pgidä¸€å®šæ˜¯ä¸‹ä¸€ä¸ªspançš„èµ·å§‹ä½ç½®
     PAGE_ID next_pgid = pgid + back_span->_pageNum;
-    // Ïòºó²éÕÒ
+    // å‘åæŸ¥æ‰¾
     while (1) {
         if (_pgSpanHash.find(next_pgid) == nullptr) 
             break;
         Span* sp = _pgSpanHash[next_pgid];
         if (sp->_isUse || sp->_pageNum + pgnum > SPAN_MAXNUM) 
             break;
-        // µİÔö
+        // é€’å¢
         pgnum += sp->_pageNum;
         next_pgid += sp->_pageNum;
-        // ºÏ²¢Ç°É¾³ıÁ´±íÉÏµÄsp½áµã
-        // Í¬Ê±»ØÊÕÄÚ´æ
+        // åˆå¹¶å‰åˆ é™¤é“¾è¡¨ä¸Šçš„spç»“ç‚¹
+        // åŒæ—¶å›æ”¶å†…å­˜
         _spList[sp->_pageNum - 1].Erase(sp);
         _spPool._spDellocate(sp);
         
     }
-    // ÎŞĞèÉ¾³ıÔ­ÓĞÓ³Éä¹ØÏµ ¸÷¸öSpanÊÇÏà¸ôµÄ
-    // Ö÷ÒªÊÇÒòÎªºÏ²¢ºóµÄspanÊÇÒ»¸öÕûÌåµÄ
-    // ÔÚºóĞøºÏ²¢Ö±½Ó´ÓÁ½¶Ë³ö·¢Ñ°ÕÒ
-    // ¸üĞÂ¹ØÏµ²¢¿ªÊ¼ºÏ²¢
+    // æ— éœ€åˆ é™¤åŸæœ‰æ˜ å°„å…³ç³» å„ä¸ªSpanæ˜¯ç›¸éš”çš„
+    // ä¸»è¦æ˜¯å› ä¸ºåˆå¹¶åçš„spanæ˜¯ä¸€ä¸ªæ•´ä½“çš„
+    // åœ¨åç»­åˆå¹¶ç›´æ¥ä»ä¸¤ç«¯å‡ºå‘å¯»æ‰¾
+    // æ›´æ–°å…³ç³»å¹¶å¼€å§‹åˆå¹¶
     back_span->_pageID = start_pgid;
     back_span->_pageNum = pgnum;
 

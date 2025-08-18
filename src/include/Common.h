@@ -1,12 +1,14 @@
 #ifndef COMMON_H
 #define COMMON_H
-#include<unordered_map> // ºóĞøÆÀ¼ÛÒ»ÏÂĞÔÄÜ
+#include<unordered_map> // åç»­è¯„ä»·ä¸€ä¸‹æ€§èƒ½
 #include <chrono>
 #include <cassert>
 #include <atomic>
 #include <thread>
-// ÒıÈëÉêÇëÏµÍ³ÄÚ´æÍ·ÎÄ¼ş
-// Ö§³Ö¿çÆ½Ì¨
+#include <iostream>
+#include <vector>
+// å¼•å…¥ç”³è¯·ç³»ç»Ÿå†…å­˜å¤´æ–‡ä»¶
+// æ”¯æŒè·¨å¹³å°
 #ifdef _WIN32
 
 	#include <Windows.h>
@@ -19,63 +21,69 @@
 #endif
 
 #ifdef _WIN64
-	typedef unsigned long long PAGE_ID;	// ±£Ö¤Æ½Ì¨Í¨ÓÃĞÔ
+	typedef unsigned long long PAGE_ID;	// ä¿è¯å¹³å°é€šç”¨æ€§
 	#define MR_SUP 5
 	#define MR_MALLOCBIT 64
 #elif _WIN32
 	typedef size_t PAGE_ID;
 	#define MR_SUP 7
 	#define MR_MALLOCBIT 32
+#elif __linux__ && __x86_64__
+	typedef unsigned long long PAGE_ID;	// ä¿è¯å¹³å°é€šç”¨æ€§
+	#define MR_SUP 5
+	#define MR_LLMAX 9223372036854775807i64
+	#define MR_MALLOCBIT 64	
+	#define min(a,b)            (((a) < (b)) ? (a) : (b))
 #endif // !_WIN64
 
-#define BYTES_BASE_SIZE 128		// ºóĞø·µ»ØµÄÊµ¼Ê·ÖÅä´óĞ¡ÊÇ¸ÃÖµµÄ±¶Êı
-#define SPAN_MAXNUM 128			// SpanListµÄ³¤¶È
-#define BYTES_BASE_ALGN 8		// »ù´¡µÄ¶ÔÆëÎ»Êı
-#define LISTSBASEPOS 15			// Á´±íµÄÇ°16¸ö»ù´¡ÏÂ±ê
-#define LISTINTERVAL 8			// Á´±íºóÃæµÄÏÂ±ê¼ä¸ô
-#define FREELISTSIZE 104		// Á´±íµÄ³¤¶È
-#define CHUNKSIZE 512 * 1024	// µ¥´ÎÉêÇëµÄ×î´óãĞÖµ512KB
-#define MAXSIZE 128				// µ¥´ÎÉêÇëµÄ×î´ó¿éÊı
-#define PAGE_SHIFT 12			// ×óÒÆµÄÎ»Êı Ò²¾ÍÊÇÒ³´óĞ¡4KB
-#define SPIN_LOCK_RETRYTIMES 16	// µÍÆµÖØÊÔ´ÎÊıÉÏÏŞÖµ 64KB´Î 
+#define BYTES_BASE_SIZE 128		// åç»­è¿”å›çš„å®é™…åˆ†é…å¤§å°æ˜¯è¯¥å€¼çš„å€æ•°
+#define SPAN_MAXNUM 128			// SpanListçš„é•¿åº¦
+#define BYTES_BASE_ALGN 8		// åŸºç¡€çš„å¯¹é½ä½æ•°
+#define LISTSBASEPOS 15			// é“¾è¡¨çš„å‰16ä¸ªåŸºç¡€ä¸‹æ ‡
+#define LISTINTERVAL 8			// é“¾è¡¨åé¢çš„ä¸‹æ ‡é—´éš”
+#define FREELISTSIZE 104		// é“¾è¡¨çš„é•¿åº¦
+#define CHUNKSIZE 512 * 1024	// å•æ¬¡ç”³è¯·çš„æœ€å¤§é˜ˆå€¼512KB
+#define MAXSIZE 128				// å•æ¬¡ç”³è¯·çš„æœ€å¤§å—æ•°
+#define PAGE_SHIFT 12			// å·¦ç§»çš„ä½æ•° ä¹Ÿå°±æ˜¯é¡µå¤§å°4KB
+#define SPIN_LOCK_RETRYTIMES 16	// ä½é¢‘é‡è¯•æ¬¡æ•°ä¸Šé™å€¼ 64KBæ¬¡ 
 
-// ÄÚ´æ³Ø¹¤¾ß¼¯ºÏ
+// å†…å­˜æ± å·¥å…·é›†åˆ
 namespace MR_MemPoolToolKits {
 
 	
-	// ¸¨Öú¼ÆËã¶ÔÆëÎ»ÊıµÄµİ¹éÄ£°å
+	// è¾…åŠ©è®¡ç®—å¯¹é½ä½æ•°çš„é€’å½’æ¨¡æ¿
 	template<size_t Size,size_t Base_Size,size_t Algin,bool Done>
 	struct _GetAlginNumHelper {
 		static constexpr size_t value = _GetAlginNumHelper< Size, Base_Size << 1, Algin << 1, (Size <= (Base_Size << 1))>::value;
 	};
 
-	// ¸¨Öú¼ÆËã¶ÔÆëÎ»ÊıÍ£Ö¹»ùÀı
+	// è¾…åŠ©è®¡ç®—å¯¹é½ä½æ•°åœæ­¢åŸºä¾‹
 	template<size_t Size, size_t Base_Size,size_t Algin>
 	struct _GetAlginNumHelper<Size, Base_Size,Algin,true> {
 		static constexpr size_t value = Algin;
 	};
 
-	// ¸¨Öú¼ÆËãÍ°Î»ÖÃµÄµİ¹éÄ£°å
+	// è¾…åŠ©è®¡ç®—æ¡¶ä½ç½®çš„é€’å½’æ¨¡æ¿
 	template<size_t Size, size_t Base_Size,size_t cnt,bool Done>
 	struct _GetIndexHelper {
 		static constexpr size_t value = _GetIndexHelper<Size, Base_Size << 1, cnt + 1, (Size <= (Base_Size << 1))>::value;
 	};
 
-	// ¸¨Öú¼ÆËãÍ°Î»ÖÃÍ£Ö¹»ùÀı
+	// è¾…åŠ©è®¡ç®—æ¡¶ä½ç½®åœæ­¢åŸºä¾‹
 	template<size_t Size, size_t Base_Size, size_t cnt>
 	struct _GetIndexHelper<Size,Base_Size,cnt,true> {
 		static constexpr size_t value = cnt;
 	};
 
 
-	// 1.¼ÆËã·µ»Ø¶ÔÆëÎ»ÊıµÄÄ£°å
+	// 1.è®¡ç®—è¿”å›å¯¹é½ä½æ•°çš„æ¨¡æ¿
 	template<size_t Size>
 	struct _GetAlginNumT {
 		static constexpr size_t val = _GetAlginNumHelper<Size, BYTES_BASE_SIZE, BYTES_BASE_ALGN, (Size <= BYTES_BASE_SIZE)>::value;
 	};
 
 
-	// 2.¼ÆËã·µ»ØÊµ¼Ê¿é´óĞ¡µÄÄ£°å
+	// 2.è®¡ç®—è¿”å›å®é™…å—å¤§å°çš„æ¨¡æ¿
 	template<size_t Size>
 	struct _RoundUpT {
 		static constexpr size_t Algin = _GetAlginNumT<Size>::val;
@@ -83,7 +91,7 @@ namespace MR_MemPoolToolKits {
 	};
 
 
-	// 3.¼ÆËãÍ°Î»ÖÃµÄÄ£°å
+	// 3.è®¡ç®—æ¡¶ä½ç½®çš„æ¨¡æ¿
 	template<size_t Size>
 	struct _GetIndexT {
 		static constexpr size_t cnt = _GetIndexHelper<Size, BYTES_BASE_SIZE, 0, (Size <= BYTES_BASE_SIZE)>::value;
@@ -91,58 +99,58 @@ namespace MR_MemPoolToolKits {
 		static constexpr size_t val = (cnt << 3) + ex;
 	};
 
-	// ÉÏÊö·½·¨µÄ·â×°
-	// ¸ù¾İÇëÇóµÄ×Ö½ÚÊı ¼ÆËã¶ÔÓ¦µÄÊµ¼Ê·µ»ØµÄ¿é´óĞ¡ºÍ¶ÔÓ¦ÏÂ±ê
+	// ä¸Šè¿°æ–¹æ³•çš„å°è£…
+	// æ ¹æ®è¯·æ±‚çš„å­—èŠ‚æ•° è®¡ç®—å¯¹åº”çš„å®é™…è¿”å›çš„å—å¤§å°å’Œå¯¹åº”ä¸‹æ ‡
 	template<size_t Size>
 	struct SizeClass {
 
-		// »ñÈ¡µ±Ç°ËùÔÚÍ°
+		// è·å–å½“å‰æ‰€åœ¨æ¡¶
 		static size_t _GetIndex() {
 			return _GetIndexT<Size>::val;
 		}
 
-		// »ñÈ¡Êµ¼Ê·µ»ØµÄ¿é´óĞ¡
+		// è·å–å®é™…è¿”å›çš„å—å¤§å°
 		static inline size_t _RoundUp() {
 			return _RoundUpT<Size>::val;
 		};
 
-		// »ñÈ¡¶ÔÆëÎ»Êı
+		// è·å–å¯¹é½ä½æ•°
 		static size_t _GetAlginNum() {
 			return _GetAlginNumT<Size>::val;
 		}
 	};
 
 
-	// ×ªÎª»ñÈ¡³£Á¿±í´ïÊ½ÀàĞÍµÄ¶ÔÏó´óĞ¡
+	// è½¬ä¸ºè·å–å¸¸é‡è¡¨è¾¾å¼ç±»å‹çš„å¯¹è±¡å¤§å°
 	template<typename T>
 	constexpr size_t GetSize() {
 		constexpr size_t size = sizeof(T);
 		return size;
 	}
 
-	// ¸ù¾İÁ´±íÏÂ±êÈ·¶¨µ±Ç°·ÖÅäµÄ¿Õ¼ä´óĞ¡
+	// æ ¹æ®é“¾è¡¨ä¸‹æ ‡ç¡®å®šå½“å‰åˆ†é…çš„ç©ºé—´å¤§å°
 	static inline size_t GetIndexSize(size_t pos) {
 
 		if (pos <= LISTSBASEPOS) 
 			return (pos + 1) * BYTES_BASE_ALGN;
-		// ·ñÔò¸ù¾İÏÂ±êÈ·¶¨µÄ¿Õ¼ä = »ù´¡¿Õ¼ä + posÈ·¶¨µÄ¶ÔÆëÎ»Êı * ÔÚ¸Ã¶ÔÆëÎ»ÊıÏÂµÄÏà¶ÔÎ»ÖÃ
+		// å¦åˆ™æ ¹æ®ä¸‹æ ‡ç¡®å®šçš„ç©ºé—´ = åŸºç¡€ç©ºé—´ + posç¡®å®šçš„å¯¹é½ä½æ•° * åœ¨è¯¥å¯¹é½ä½æ•°ä¸‹çš„ç›¸å¯¹ä½ç½®
 		size_t rel_pos = pos - LISTSBASEPOS - (pos - LISTSBASEPOS -1) / LISTINTERVAL * LISTINTERVAL;
 		size_t algin = BYTES_BASE_ALGN << ((pos - LISTSBASEPOS - 1) / LISTINTERVAL + 1);
 		return algin * rel_pos + (BYTES_BASE_SIZE << ((pos - LISTSBASEPOS - 1) / LISTINTERVAL));
 	}
 
-	// ĞŞÕıThreadCacheÏòCentralCacheÉêÇëµÄÄÚ´æ¿é¸öÊı
-	// ÒÀ¾İÉêÇëµÄÄÚ´æ¿é´óĞ¡size
+	// ä¿®æ­£ThreadCacheå‘CentralCacheç”³è¯·çš„å†…å­˜å—ä¸ªæ•°
+	// ä¾æ®ç”³è¯·çš„å†…å­˜å—å¤§å°size
 	static inline size_t CheckSize(size_t size) {
 
-		// ¸ÄÎª×î¶àÒ»´ÎÉêÇë512¿éĞ¡¿éÄÚ´æ
+		// æ”¹ä¸ºæœ€å¤šä¸€æ¬¡ç”³è¯·512å—å°å—å†…å­˜
 		assert(size);
 		if (CHUNKSIZE / size >= (MAXSIZE << 2))
 			return MAXSIZE << 2;
 		return CHUNKSIZE / size;
 	}
 
-	// ¼ÆËãgcdµÄ¸¨Öúº¯Êı
+	// è®¡ç®—gcdçš„è¾…åŠ©å‡½æ•°
 	static inline size_t GCD(size_t a, size_t b) {
 
 		assert(a && "in gcd a!=0");
@@ -156,8 +164,8 @@ namespace MR_MemPoolToolKits {
 		return a;
 	}
 
-	// ĞŞÕıCentralCacheÏòPageCacheÉêÇëµÄÒ³ÊıÁ¿
-	// ÒÀ¾İÊÇÉêÇëµÄÄÚ´æ¿é´óĞ¡size
+	// ä¿®æ­£CentralCacheå‘PageCacheç”³è¯·çš„é¡µæ•°é‡
+	// ä¾æ®æ˜¯ç”³è¯·çš„å†…å­˜å—å¤§å°size
 	static inline size_t CheckPageNum(size_t size) {
 
 		size_t pagesize = 1 << PAGE_SHIFT;
@@ -166,16 +174,16 @@ namespace MR_MemPoolToolKits {
 	}
 
 
-	//Ö±½ÓÈ¥¶ÑÉÏÉêÇë°´Ò³ÉêÇë¿Õ¼ä
-	// pagenumÊÇÉêÇëµÄÒ³¸öÊı
-	// ×óÒÆPAGE_SHIFTÊÇÉêÇë8KB * Ò³Êı
+	//ç›´æ¥å»å †ä¸Šç”³è¯·æŒ‰é¡µç”³è¯·ç©ºé—´
+	// pagenumæ˜¯ç”³è¯·çš„é¡µä¸ªæ•°
+	// å·¦ç§»PAGE_SHIFTæ˜¯ç”³è¯·8KB * é¡µæ•°
 	static inline void* SystemAlloc(size_t pagenum) {
 #ifdef _WIN32
 
 		void* ptr = VirtualAlloc(0, pagenum << PAGE_SHIFT, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 #else
-		// linuxÏÂbrk mmapµÈ
-		void* ptr = mmap(0, kpage << PAGE_SHIFT, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		// linuxä¸‹brk mmapç­‰
+		void* ptr = mmap(0, pagenum << PAGE_SHIFT, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #endif
 		if (ptr == nullptr){
 			printf("apply for system malloc failed!\n");
@@ -184,20 +192,20 @@ namespace MR_MemPoolToolKits {
 		return ptr;
 	}
 
-	// ¿çÆ½Ì¨µÄÄÚ´æÊÍ·Åº¯Êı
-	// ¼ÇÂ¼µÄ pgid Ò³µÄÆğÊ¼µØÖ·
+	// è·¨å¹³å°çš„å†…å­˜é‡Šæ”¾å‡½æ•°
+	// è®°å½•çš„ pgid é¡µçš„èµ·å§‹åœ°å€
 	static inline void SystemFree(PAGE_ID pgid) {
 		if (pgid == 0) return;
 		void* ptr = reinterpret_cast<void*>(pgid << PAGE_SHIFT);
 
 #ifdef _WIN32
-		// Windows ÏÂÊ¹ÓÃ VirtualFree
+		// Windows ä¸‹ä½¿ç”¨ VirtualFree
 		if (!VirtualFree(ptr, 0, MEM_RELEASE)) {
 			printf("Failed to free memory on Windows!\n");
 			exit(-1);
 		}
 #else
-		// Linux/Unix ÏÂÊ¹ÓÃ munmap
+		// Linux/Unix ä¸‹ä½¿ç”¨ munmap
 		if (munmap(ptr, pgid << PAGE_SHIFT) == -1) {
 			printf("Failed to free memory on Linux/Unix!\n");
 			exit(-1);
@@ -206,8 +214,8 @@ namespace MR_MemPoolToolKits {
 	}
 
 
-	// ¼ÆÊ±Æ÷ ÓÃÓÚÍ³¼ÆÒ»¶ÎÊ±¼ä 
-	// ¿ÉÓÃÓÚÆÀ¹ÀĞÔÄÜ
+	// è®¡æ—¶å™¨ ç”¨äºç»Ÿè®¡ä¸€æ®µæ—¶é—´ 
+	// å¯ç”¨äºè¯„ä¼°æ€§èƒ½
 	class Timer {
 	public:
 		Timer() = default;
@@ -231,10 +239,10 @@ namespace MR_MemPoolToolKits {
 
 		SpinLock() = default;
 
-		// »ñÈ¡Ëø ÇÒÈç¹ûÃ»»ñÈ¡Ôòµ±Ç°Ïß³ÌÒªÃ´sleepµÈ´ı ÒªÃ´Á¢¼´ÈÃ³öCPU
+		// è·å–é” ä¸”å¦‚æœæ²¡è·å–åˆ™å½“å‰çº¿ç¨‹è¦ä¹ˆsleepç­‰å¾… è¦ä¹ˆç«‹å³è®©å‡ºCPU
 		void Lock() {
 			retries = 0;
-			// memory_order_acquire ±£Ö¤ºóĞø¶Á²Ù×÷ÄÜ¿´¼ûµ±Ç°¼°Ö®Ç°µÄĞ´²Ù×÷
+			// memory_order_acquire ä¿è¯åç»­è¯»æ“ä½œèƒ½çœ‹è§å½“å‰åŠä¹‹å‰çš„å†™æ“ä½œ
 			while (_flag.test_and_set(std::memory_order_acquire)) {
 				backoff();
 				retries++;
@@ -242,8 +250,8 @@ namespace MR_MemPoolToolKits {
 		}
 
 		void Unlock() {
-			// clear°Ñ_flagÖÃÎªfalse Ê¹ÓÃmemory_order_release¿ÉÒÔ±£Ö¤
-			// ºóĞø¶ÁÈ¡µÄÖµ¶¼ÊÇ»ùÓÚĞŞ¸ÄÖ®ºóµÄ ÈÃÆäËûÏß³Ì¿´µ½µ±Ç°ĞŞ¸ÄÖµ
+			// clearæŠŠ_flagç½®ä¸ºfalse ä½¿ç”¨memory_order_releaseå¯ä»¥ä¿è¯
+			// åç»­è¯»å–çš„å€¼éƒ½æ˜¯åŸºäºä¿®æ”¹ä¹‹åçš„ è®©å…¶ä»–çº¿ç¨‹çœ‹åˆ°å½“å‰ä¿®æ”¹å€¼
 			_flag.clear(std::memory_order_release);
 		}
 
@@ -251,11 +259,11 @@ namespace MR_MemPoolToolKits {
 
 		void backoff() {
 			if (retries <=( 1<< SPIN_LOCK_RETRYTIMES)) {
-				// ÈÃ³öCPU ºÍtimesleepÇø±ğÔÚÓÚ±ÜÃâ²»±ØÒªµÈ´ı
+				// è®©å‡ºCPU å’ŒtimesleepåŒºåˆ«åœ¨äºé¿å…ä¸å¿…è¦ç­‰å¾…
 				std::this_thread::yield();
 			}
 			else {
-				// Ëæ»ú¶ÌÊ±Ë¯Ãß
+				// éšæœºçŸ­æ—¶ç¡çœ 
 				auto timeInterval = std::chrono::nanoseconds(rand() % (retries - (1 <<SPIN_LOCK_RETRYTIMES)));
 				std::this_thread::sleep_for(timeInterval);
 			}
@@ -266,13 +274,13 @@ namespace MR_MemPoolToolKits {
 	};
 
 
-	// ¹ÜÀíĞ¡¿éÄÚ´æµÄ×ÔÓÉÁ´±í
-	// Ö§³Ö·¶Î§Á´±íµÄ²åÈëºÍÉ¾³ı
-	// ¸ÃÁ´±íÃ»ÓĞÄÚ´æËùÓĞÈ¨ Îö¹¹Ê±ÎŞĞèÇåÀíÄÚ´æ
+	// ç®¡ç†å°å—å†…å­˜çš„è‡ªç”±é“¾è¡¨
+	// æ”¯æŒèŒƒå›´é“¾è¡¨çš„æ’å…¥å’Œåˆ é™¤
+	// è¯¥é“¾è¡¨æ²¡æœ‰å†…å­˜æ‰€æœ‰æƒ ææ„æ—¶æ— éœ€æ¸…ç†å†…å­˜
 	class _FreeLists {
 	public:
 
-		// ·ÀÖ¹Ò°Ö¸Õë
+		// é˜²æ­¢é‡æŒ‡é’ˆ
 		_FreeLists() {
 			_freelist_head = nullptr;
 			_size = 0;
@@ -280,8 +288,8 @@ namespace MR_MemPoolToolKits {
 		}
 
 
-		// Á´±íÃ»ÓĞÄÚ´æËùÓĞÈ¨ Îö¹¹Ê±ÎŞĞèÇåÀíÄÚ´æ
-		// ÄÚ´æ»ØÊÕ¹¤×÷½»¸ø×îÉÏ²ãµÄPAGE_CACHE
+		// é“¾è¡¨æ²¡æœ‰å†…å­˜æ‰€æœ‰æƒ ææ„æ—¶æ— éœ€æ¸…ç†å†…å­˜
+		// å†…å­˜å›æ”¶å·¥ä½œäº¤ç»™æœ€ä¸Šå±‚çš„PAGE_CACHE
 		~_FreeLists() = default;
 
 		void _ResetFreeList() {
@@ -290,21 +298,21 @@ namespace MR_MemPoolToolKits {
 			_freq = 1;
 		}
 
-		// Á´±íÍ·²¿²åÈëµ¥¸ö½áµã
+		// é“¾è¡¨å¤´éƒ¨æ’å…¥å•ä¸ªç»“ç‚¹
 		void headpush(void* back_mem) {
-			// ÎŞÂÛÊÇ¶ş¼¶»¹ÊÇÒ»¼¶Ö¸Õë±¾ÖÊÉÏ¾ÍÊÇÓÃ
-			// Ö¸Õë´æ·ÅÄ³¸öµØÖ· ¶ş¼¶Ö¸Õë½âÒıÓÃÊÇÄÚ´æ¿éµÄµØÖ·
+			// æ— è®ºæ˜¯äºŒçº§è¿˜æ˜¯ä¸€çº§æŒ‡é’ˆæœ¬è´¨ä¸Šå°±æ˜¯ç”¨
+			// æŒ‡é’ˆå­˜æ”¾æŸä¸ªåœ°å€ äºŒçº§æŒ‡é’ˆè§£å¼•ç”¨æ˜¯å†…å­˜å—çš„åœ°å€
 			assert(back_mem);
 			Next(back_mem) = _freelist_head;
 			_freelist_head = back_mem;
 			_size += 1;
 		}
 
-		// »ñÈ¡Á´±íÍ·²¿µ¥¸ö½áµã
+		// è·å–é“¾è¡¨å¤´éƒ¨å•ä¸ªç»“ç‚¹
 		void* headpop() {
 
 			void* res = nullptr;
-			// È¡¶ş¼¶Ö¸ÕëµÄµØÖ· 
+			// å–äºŒçº§æŒ‡é’ˆçš„åœ°å€ 
 			assert(_freelist_head);
 			void* next = Next(_freelist_head);
 			res = _freelist_head;
@@ -315,7 +323,7 @@ namespace MR_MemPoolToolKits {
 			return res;
 		}
 
-		// ²åÈëÒ»´ó¿é½áµã
+		// æ’å…¥ä¸€å¤§å—ç»“ç‚¹
 		void headRangePush(void* start,void* end,size_t num){
 
 			assert(start);
@@ -326,8 +334,8 @@ namespace MR_MemPoolToolKits {
 			_size += num;
 		}
 
-		// ´«Èë¿ÕµÄÆğÊ¼µã ·µ»Ø×ÔĞŞÕıÆÚÍûnum³¤¶ÈµÄÁ´±í
-		// startÆğÊ¼½áµã numqÆÚÍû½áµãÊıÁ¿
+		// ä¼ å…¥ç©ºçš„èµ·å§‹ç‚¹ è¿”å›è‡ªä¿®æ­£æœŸæœ›numé•¿åº¦çš„é“¾è¡¨
+		// startèµ·å§‹ç»“ç‚¹ numqæœŸæœ›ç»“ç‚¹æ•°é‡
 		void headRangePop(void*& start,void*&end,size_t& num) {
 			
 			assert(_freelist_head && "Freelist head nullptr!");
@@ -341,42 +349,42 @@ namespace MR_MemPoolToolKits {
 			Next(end) = nullptr;
 		}
 
-		// »ñÈ¡Á´±íÍ·²¿ Í¨³£ÓÃÓÚ×÷Îª·ÖÅä
-		// ·¶Î§½áµãµÄÆğÊ¼Î»ÖÃ
+		// è·å–é“¾è¡¨å¤´éƒ¨ é€šå¸¸ç”¨äºä½œä¸ºåˆ†é…
+		// èŒƒå›´ç»“ç‚¹çš„èµ·å§‹ä½ç½®
 		void* GetListHead() {
 
 			return _freelist_head;
 		}
 
-		// ·µ»ØÒ»¸ö×óÖµÒıÓÃ Ò²·½±ãĞŞ¸Ä
+		// è¿”å›ä¸€ä¸ªå·¦å€¼å¼•ç”¨ ä¹Ÿæ–¹ä¾¿ä¿®æ”¹
 		void*& Next(void* obj) {
 
 			assert(obj && "obj cannot be null");
 			return *(void**)obj;
 		}
 
-		// »ñÈ¡Á´±íÏòÏÂ²ãÉêÇëĞ¡¿éÄÚ´æµÄÆµ´Î
+		// è·å–é“¾è¡¨å‘ä¸‹å±‚ç”³è¯·å°å—å†…å­˜çš„é¢‘æ¬¡
 		size_t GetFreq() {
 			
 			return _freq;
 		}
 
-		// Ôö¼ÓÆµ´Î
+		// å¢åŠ é¢‘æ¬¡
 		void PlusFreq() {
 			_freq += 1;
 		}
 
-		// ¼õÉÙÆµ´Î
+		// å‡å°‘é¢‘æ¬¡
 		void SubFreq() {
 			_freq -= 1;
 		}
 
-		// »ñÈ¡µ±Ç°Á´±í¿ÉÓÃ³¤¶È
+		// è·å–å½“å‰é“¾è¡¨å¯ç”¨é•¿åº¦
 		size_t GetRemainSize() const{
 			return _size;
 		}
 
-		// ÅĞ¶ÏÁ´±íÊÇ·ñÎª¿Õ
+		// åˆ¤æ–­é“¾è¡¨æ˜¯å¦ä¸ºç©º
 		bool Empty() const{
 
 			return _size == 0;
@@ -387,30 +395,30 @@ namespace MR_MemPoolToolKits {
 
 		void* _freelist_head;
 
-		size_t _size;		// ¶¨ÒåÒ»¸öÁ´±íÊıÁ¿
-		size_t _freq;		// ·ÃÎÊÆµ´Î
+		size_t _size;		// å®šä¹‰ä¸€ä¸ªé“¾è¡¨æ•°é‡
+		size_t _freq;		// è®¿é—®é¢‘æ¬¡
 
 	};
 
 
-	// Ò»¸öSpan¶ÔÏó¹ÜÀíÒ»¸ö»ò¶à¸öÒ³
-	// SpanËù¹ÜÀíµÄÒ³Ò»¶¨ÊÇÁ¬ĞøµÄ
+	// ä¸€ä¸ªSpanå¯¹è±¡ç®¡ç†ä¸€ä¸ªæˆ–å¤šä¸ªé¡µ
+	// Spanæ‰€ç®¡ç†çš„é¡µä¸€å®šæ˜¯è¿ç»­çš„
 	class Span {
 	public:
 
-		Span* _prev;		// Ç°Çı½áµã
-		Span* _next;		// ºó¼Ì½áµã		
+		Span* _prev;		// å‰é©±ç»“ç‚¹
+		Span* _next;		// åç»§ç»“ç‚¹		
 
-		PAGE_ID _pageID;		// ¼ÇÂ¼ÆğÊ¼Ò³ºÅ
-		PAGE_ID _pageNum;		// ¼ÇÂ¼·ÖÅäµÄÒ³ÊıÁ¿			
+		PAGE_ID _pageID;		// è®°å½•èµ·å§‹é¡µå·
+		PAGE_ID _pageNum;		// è®°å½•åˆ†é…çš„é¡µæ•°é‡			
 
-		size_t _usedcount;		// ÒÑ¾­Ê¹ÓÃµÄĞ¡¿éÄÚ´æÊıÁ¿
-		size_t _sum;		// span¹ÜÀíµÄÄÚ´æ¿é×ÜÊı
-		bool _isUse;		// Èç¹ûÕâ¸ö¿éÒÑ¾­ÔÚCentralCache»òÕßÕı×¼±¸·ÖÅä¸øCentralCache ÖÃÎªtrue
+		size_t _usedcount;		// å·²ç»ä½¿ç”¨çš„å°å—å†…å­˜æ•°é‡
+		size_t _sum;		// spanç®¡ç†çš„å†…å­˜å—æ€»æ•°
+		bool _isUse;		// å¦‚æœè¿™ä¸ªå—å·²ç»åœ¨CentralCacheæˆ–è€…æ­£å‡†å¤‡åˆ†é…ç»™CentralCache ç½®ä¸ºtrue
 
-		_FreeLists _freelist;		// ¹ÜÀíµÄĞ¡¿éÄÚ´æÁ´±í
+		_FreeLists _freelist;		// ç®¡ç†çš„å°å—å†…å­˜é“¾è¡¨
 
-		// Ä¬ÈÏ¹¹Ôìº¯Êı
+		// é»˜è®¤æ„é€ å‡½æ•°
 		Span() : _prev(nullptr), _next(nullptr), _pageID(0),
 			_pageNum(0), _usedcount(0), _sum(0), _isUse(false), _freelist() {}
 
@@ -421,10 +429,10 @@ namespace MR_MemPoolToolKits {
 		}
 	};
 
-	// ¹ÜÀí²»Í¬´óĞ¡µÄSpanµÄÁ´±í
-	// ²ÉÓÃË«ÏòÁ´±íÊÇÎªÁË·½±ãÉ¾³ıºÍÔö¼Ó½áµã
-	// Ö´ĞĞµÄÔöÉ¾¸Ä²é¶¼ÊÇµ¥¸öspan
-	// ÄÚ´æ³ØÎö¹¹Ê±Ö±½ÓÊÍ·ÅÄÚ´æ
+	// ç®¡ç†ä¸åŒå¤§å°çš„Spançš„é“¾è¡¨
+	// é‡‡ç”¨åŒå‘é“¾è¡¨æ˜¯ä¸ºäº†æ–¹ä¾¿åˆ é™¤å’Œå¢åŠ ç»“ç‚¹
+	// æ‰§è¡Œçš„å¢åˆ æ”¹æŸ¥éƒ½æ˜¯å•ä¸ªspan
+	// å†…å­˜æ± ææ„æ—¶ç›´æ¥é‡Šæ”¾å†…å­˜
 	class SpanList {
 	public:
 
@@ -433,23 +441,23 @@ namespace MR_MemPoolToolKits {
 			_spHead = nullptr;
 		}
 
-		// ÎŞĞè¹ÜÀí½áµã¹ØÏµ
+		// æ— éœ€ç®¡ç†ç»“ç‚¹å…³ç³»
 		~SpanList() = default;
 
 
-		// »ñÈ¡spanÁ´±íÍ· 
+		// è·å–spané“¾è¡¨å¤´ 
 		Span* Begin() {
 
 			return _spHead;
 		}
 
-		// »ñÈ¡spanÁ´±íÎ²
+		// è·å–spané“¾è¡¨å°¾
 		Span* End() {
 
 			return nullptr;
 		}
 
-		// É¾³ıÖ¸¶¨Î»ÖÃspan
+		// åˆ é™¤æŒ‡å®šä½ç½®span
 		void Erase(Span* pos) {
 
 			assert(pos);
@@ -466,7 +474,7 @@ namespace MR_MemPoolToolKits {
 			pos->_next = nullptr;
 		}
 
-		// Í·²å
+		// å¤´æ’
 		void headPushSpan(Span* newSpan) {
 
 			assert(newSpan);
@@ -476,8 +484,8 @@ namespace MR_MemPoolToolKits {
 			_spHead = newSpan;
 		}
 
-		// Ê×ÏÈ¼ì²éspanÊÇ·ñÔÚµ±Ç°Á´±íÀïÃæ 
-		// ²»ÔÚµÄ»°Ö±½Óµ÷ÓÃheadpushÍ·²å
+		// é¦–å…ˆæ£€æŸ¥spanæ˜¯å¦åœ¨å½“å‰é“¾è¡¨é‡Œé¢ 
+		// ä¸åœ¨çš„è¯ç›´æ¥è°ƒç”¨headpushå¤´æ’
 		void insertSpan(Span* span) {
 			
 			assert(span);
@@ -491,7 +499,7 @@ namespace MR_MemPoolToolKits {
 				headPushSpan(span);
 		}
 
-		// Í·³ö
+		// å¤´å‡º
 		Span* headPopSpan() {
 			
 			if (_spHead) {
@@ -504,8 +512,8 @@ namespace MR_MemPoolToolKits {
 			return nullptr;
 		}
 
-		// »ñÈ¡Ò»¸ö¿ÉÓÃµÄspan
-		// Èç¹ûÃ»ÓĞÔò·µ»Ønullptr
+		// è·å–ä¸€ä¸ªå¯ç”¨çš„span
+		// å¦‚æœæ²¡æœ‰åˆ™è¿”å›nullptr
 		Span* getAvaSpan() {
 
 			while (_spHead) {
@@ -516,7 +524,7 @@ namespace MR_MemPoolToolKits {
 			return nullptr;
 		}
 
-		// Ö¸¶¨Î»ÖÃ³ö
+		// æŒ‡å®šä½ç½®å‡º
 		Span* popSpan(Span* pos) {
 			
 			assert(pos);
@@ -530,17 +538,17 @@ namespace MR_MemPoolToolKits {
 			return pos;
 		}
 
-		// ¿ÉÒÔ¿¼ÂÇºóÆÚÌí¼ÓÔËËã·ûÖØÔØ
+		// å¯ä»¥è€ƒè™‘åæœŸæ·»åŠ è¿ç®—ç¬¦é‡è½½
 
-		SpinLock _mtx;		// Í°Ëø
+		SpinLock _mtx;		// æ¡¶é”
 
 	private:
 		
-		Span* _spHead;		// Á´±íÍ·
+		Span* _spHead;		// é“¾è¡¨å¤´
 
 	};
 
-	// ¶¨³¤ÄÚ´æ³Ø
+	// å®šé•¿å†…å­˜æ± 
 	template <class T>
 	class MemoryPool {
 	public:
@@ -550,17 +558,17 @@ namespace MR_MemPoolToolKits {
 		}
 
 		T* Allocate() {
-			// ³¬³öµ¥´ÎµÄ×î´óÉêÇëÄÚ´æãĞÖµ
+			// è¶…å‡ºå•æ¬¡çš„æœ€å¤§ç”³è¯·å†…å­˜é˜ˆå€¼
 			constexpr size_t _memSize = GetSize<T>();
 			if (_memSize > MAXSIZE)
 				return (T*)::operator new(_memSize);
-			// »ñÈ¡Êµ¼Ê¶ÔÆëÎ»ÊıÒÔ¼°Ô¤ÆÚ·ÖÅäµÄ¿Õ¼ä´óĞ¡
+			// è·å–å®é™…å¯¹é½ä½æ•°ä»¥åŠé¢„æœŸåˆ†é…çš„ç©ºé—´å¤§å°
 			size_t algin = SizeClass<_memSize>::_GetAlginNum();
 			size_t chunk_size = SizeClass<_memSize>::_RoundUp();
 			size_t pos = get_pos();
 
 			if (_freelists[pos].Empty()) {
-				// ´Óchunk_allocÀïÃæÄÃÒ»´ó¿éÄÚ´æ Í¬Ê±²¹³ä_free_lists
+				// ä»chunk_allocé‡Œé¢æ‹¿ä¸€å¤§å—å†…å­˜ åŒæ—¶è¡¥å……_free_lists
 				size_t num = 128;
 				char* chunk = chunk_alloc(chunk_size, num, algin);
 				for (size_t i = 0; i < num; i++) {
@@ -591,7 +599,7 @@ namespace MR_MemPoolToolKits {
 		size_t _remain;
 		static constexpr size_t _memSize = GetSize<T>();
 
-		// ¼ÇÂ¼·ÖÅäµÄ´ó¿éÄÚ´æÆğÊ¼µØÖ· ÓÃÓÚÊÍ·Å
+		// è®°å½•åˆ†é…çš„å¤§å—å†…å­˜èµ·å§‹åœ°å€ ç”¨äºé‡Šæ”¾
 		std::vector<char*> _startrecord;
 
 		size_t get_pos() const {
@@ -599,21 +607,21 @@ namespace MR_MemPoolToolKits {
 			return SizeClass<_memSize>::_GetIndex();
 		}
 
-		// ÖØÒªµÄ¿é·ÖÅäº¯Êı
-		// nÊÇÇëÇóµÄµ¥¸ö¿é´óĞ¡ 
+		// é‡è¦çš„å—åˆ†é…å‡½æ•°
+		// næ˜¯è¯·æ±‚çš„å•ä¸ªå—å¤§å° 
 		char* chunk_alloc(size_t n, size_t& num, size_t algin) {
 			char* res = nullptr;
 			size_t total_chunk = n * num;
 			size_t pos = get_pos();
-			// Ê£ÏÂµÄÄÚ´æÍêÃÀÂú×ãÒªÇó
+			// å‰©ä¸‹çš„å†…å­˜å®Œç¾æ»¡è¶³è¦æ±‚
 			if (_remain >= num * n) {
 				res = _memstart;
 				_memstart += total_chunk;
 				_remain -= total_chunk;
 				return res;
 			}
-			// Ê£ÏÂµÄÄÚ´æÄÜÂú×ãÒ»¸ö¿é µ«ÎŞ·¨Âú×ã¶à¸ö¿é
-			// ´ËÊ±·µ»Ø¸øÉÏÒ»²ãµ÷ÓÃ ÇÒ¸üÕınumµÄ´óĞ¡
+			// å‰©ä¸‹çš„å†…å­˜èƒ½æ»¡è¶³ä¸€ä¸ªå— ä½†æ— æ³•æ»¡è¶³å¤šä¸ªå—
+			// æ­¤æ—¶è¿”å›ç»™ä¸Šä¸€å±‚è°ƒç”¨ ä¸”æ›´æ­£numçš„å¤§å°
 			else if (_remain >= n) {
 				num = _remain / n;
 				_remain -= num * n;
@@ -621,14 +629,14 @@ namespace MR_MemPoolToolKits {
 				_memstart += num * n;
 				return res;
 			}
-			// Ò»¸ö¿éÒ²ÎŞ·¨Âú×ãÁË 
+			// ä¸€ä¸ªå—ä¹Ÿæ— æ³•æ»¡è¶³äº† 
 			else {
 				size_t chunk = 2 * total_chunk;
-				// ÏÈÕ¥¸ÉÊ£Óà¼ÛÖµ ½«Ê£ÏÂµÄÁãËé¿Õ¼ä¹ÒÔØÖÁÁ´±íÉÏ
+				// å…ˆæ¦¨å¹²å‰©ä½™ä»·å€¼ å°†å‰©ä¸‹çš„é›¶ç¢ç©ºé—´æŒ‚è½½è‡³é“¾è¡¨ä¸Š
 				while (_remain > 0) {
 					int m = _remain - algin;
 					if (m < 0) {
-						// Õâ²¿·Ö¿Õ¼ä¿ÉÄÜ»¹ÓĞÊ£Óà µ«Ä¿Ç°ÏÈ²»×ö´¦Àí
+						// è¿™éƒ¨åˆ†ç©ºé—´å¯èƒ½è¿˜æœ‰å‰©ä½™ ä½†ç›®å‰å…ˆä¸åšå¤„ç†
 						break;
 					}
 					_remain -= algin;
@@ -637,56 +645,56 @@ namespace MR_MemPoolToolKits {
 				}
 				_remain = 0;
 				_memstart = (char*)::operator new(chunk);
-				// Èç¹ûÁ¬ÏµÍ³¶¼ÎŞ·¨·ÖÅäÁË ÄÇ¾ÍÈ¥freelistsÈ¡¿ÉÄÜ¿ÉÓÃµÄ
+				// å¦‚æœè¿ç³»ç»Ÿéƒ½æ— æ³•åˆ†é…äº† é‚£å°±å»freelistså–å¯èƒ½å¯ç”¨çš„
 				if (!_memstart) {
-					// Å²¶¯ºóĞøµÄfreelists
+					// æŒªåŠ¨åç»­çš„freelists
 					for (size_t i = pos + 1; i < FREELISTSIZE; i++) {
 						if (!_freelists[i].Empty()) {
 							_memstart = (char*)_freelists[i].headpop();
 							_remain += GetIndexSize(i);
-							// ½øÈëallocÔÙ´ÎÈ¥ĞŞÕınum
+							// è¿›å…¥allocå†æ¬¡å»ä¿®æ­£num
 							return chunk_alloc(n, num, algin);
 						}
 					}
-					// Èç¹ûµ½ÕâÀïÁË ËµÃ÷mallocÒ²²»ĞĞ freelistÒ²Ã»ÓĞÊ£ÓàÂú×ãÒªÇóµÄÄÚ´æÁË
-					// Ö»ÄÜ³¢ÊÔÏÈÇåÀí»º´æ»òÄ£ÄâOOM»úÖÆ
+					// å¦‚æœåˆ°è¿™é‡Œäº† è¯´æ˜mallocä¹Ÿä¸è¡Œ freelistä¹Ÿæ²¡æœ‰å‰©ä½™æ»¡è¶³è¦æ±‚çš„å†…å­˜äº†
+					// åªèƒ½å°è¯•å…ˆæ¸…ç†ç¼“å­˜æˆ–æ¨¡æ‹ŸOOMæœºåˆ¶
 					throw std::bad_alloc();
 				}
-				// ¼ÇÂ¼¸øÖ¸Õë·ÖÅäµÄµØÖ· Ò²¼´Ö¸Õë±¾ÉíµÄµØÖ·
+				// è®°å½•ç»™æŒ‡é’ˆåˆ†é…çš„åœ°å€ ä¹Ÿå³æŒ‡é’ˆæœ¬èº«çš„åœ°å€
 				_startrecord.push_back(_memstart);
 				_remain += chunk;
-				// ´ËÊ±Ó¦¸Ã»ñµÃÁË¹»¶àµÄchunkÁË µ«ĞèÒª·µ»ØÒ»¸öºÏÊÊµÄnumÓÃÓÚfreelists
+				// æ­¤æ—¶åº”è¯¥è·å¾—äº†å¤Ÿå¤šçš„chunkäº† ä½†éœ€è¦è¿”å›ä¸€ä¸ªåˆé€‚çš„numç”¨äºfreelists
 				return chunk_alloc(n, num, algin);
 			}
 		}// chunk_alloc 
 	};
 
 
-	// ¶¨³¤ÄÚ´æ³ØÎ¬»¤µÄspan¶ÔÏó
-	// ½ö¸øpagecacheÊ¹ÓÃ
+	// å®šé•¿å†…å­˜æ± ç»´æŠ¤çš„spanå¯¹è±¡
+	// ä»…ç»™pagecacheä½¿ç”¨
 	class SpanPool {
 	public:
-		// »ñÈ¡ĞÂµÄspanÖ¸Õë¶ÔÏó
+		// è·å–æ–°çš„spanæŒ‡é’ˆå¯¹è±¡
 		Span* _spAllocate() {
-			// Î´³õÊ¼»¯ÄÚ´æ
+			// æœªåˆå§‹åŒ–å†…å­˜
 			Span* newSpanMemory = _spPool.Allocate();
 			Span* newSpan = new (newSpanMemory) Span(); // placement new
 
 			return newSpan;
 		}
 
-		// »ØÊÕspanÖ¸Õë¶ÔÏó
+		// å›æ”¶spanæŒ‡é’ˆå¯¹è±¡
 		void _spDellocate(Span* back_span) {
 			_spPool.DeAllocate(back_span);
 		}
 
 	private:
-		// ¶ÔÏó³Ø
+		// å¯¹è±¡æ± 
 		MemoryPool<Span> _spPool;
 	};
 
-	// Èı²ã»ùÊıÊ÷
-	// 64Î»ÏÂBITS = 64 
+	// ä¸‰å±‚åŸºæ•°æ ‘
+	// 64ä½ä¸‹BITS = 64 
 	template<size_t BITS>
 	class RadixTree {
 	public:
@@ -696,8 +704,8 @@ namespace MR_MemPoolToolKits {
 			_rtsize = 0;
 		}
 
-		// ÓÉÓÚ½áµãµÄÄÚ´æÒ²À´×ÔÓÚÄÚ´æ³Ø
-		// Òò´ËÎö¹¹ÎŞĞèÊÍ·ÅÄÚ´æ ¶øÊÇÓÉÄÚ´æ³Ø×Ô¼ºÎö¹¹Ê±ÊÍ·Å
+		// ç”±äºç»“ç‚¹çš„å†…å­˜ä¹Ÿæ¥è‡ªäºå†…å­˜æ± 
+		// å› æ­¤ææ„æ— éœ€é‡Šæ”¾å†…å­˜ è€Œæ˜¯ç”±å†…å­˜æ± è‡ªå·±ææ„æ—¶é‡Šæ”¾
 		~RadixTree() = default;
 		
 		void insert(PAGE_ID pgid,Span* span) {
@@ -754,45 +762,45 @@ namespace MR_MemPoolToolKits {
 
 	private:
 
-		static const size_t FIRST_LAYERNUM = (BITS - PAGE_SHIFT + MR_SUP) / 3; // Ç°Á½²ã¸÷19Î»
-		static const size_t FS_MAXLENTH = 1 << FIRST_LAYERNUM;		// Ç°Á½²ãÔªËØÔªËØ¸öÊı
-		static const size_t LEAF_LAYERNUM = BITS - PAGE_SHIFT - 2 * FIRST_LAYERNUM;	// µÚÈı²ãÎ»Êı14Î»
-		static const size_t LEAF_LENGTH = 1 << LEAF_LAYERNUM;		// µÚÈı²ãÔªËØ¸öÊı
-		size_t _rtsize;		// »ùÊıÊ÷°üº¬µÄÔªËØ¸öÊı
+		static const size_t FIRST_LAYERNUM = (BITS - PAGE_SHIFT + MR_SUP) / 3; // å‰ä¸¤å±‚å„19ä½
+		static const size_t FS_MAXLENTH = 1 << FIRST_LAYERNUM;		// å‰ä¸¤å±‚å…ƒç´ å…ƒç´ ä¸ªæ•°
+		static const size_t LEAF_LAYERNUM = BITS - PAGE_SHIFT - 2 * FIRST_LAYERNUM;	// ç¬¬ä¸‰å±‚ä½æ•°14ä½
+		static const size_t LEAF_LENGTH = 1 << LEAF_LAYERNUM;		// ç¬¬ä¸‰å±‚å…ƒç´ ä¸ªæ•°
+		size_t _rtsize;		// åŸºæ•°æ ‘åŒ…å«çš„å…ƒç´ ä¸ªæ•°
 
 		class _leaf {
 		public:
 			_leaf() {
-				for (int i = 0; i < LEAF_LENGTH; i++)
+				for (size_t i = 0; i < LEAF_LENGTH; i++)
 					leafval[i] = nullptr;
 			}
 
-			Span* leafval[LEAF_LENGTH]; // 64Î»ÏÂÎª128KB
+			Span* leafval[LEAF_LENGTH]; // 64ä½ä¸‹ä¸º128KB
 		};
 
 		class _node2 {
 		public:
 			_node2() {
-				for (int i = 0; i < FS_MAXLENTH; i++)
+				for (size_t i = 0; i < FS_MAXLENTH; i++)
 					nodeval[i] = nullptr;
 			}
 
-			_leaf* nodeval[FS_MAXLENTH]; // 64Î»ÏÂÎª4MB
+			_leaf* nodeval[FS_MAXLENTH]; // 64ä½ä¸‹ä¸º4MB
 		};
 
 		class _node1 {
 		public:
 			_node1() {
-				for (int i = 0; i < FS_MAXLENTH; i++)
+				for (size_t i = 0; i < FS_MAXLENTH; i++)
 					nodeval[i] = nullptr;
 			}
 
-			_node2* nodeval[FS_MAXLENTH]; // 64Î»ÏÂÎª4MB
+			_node2* nodeval[FS_MAXLENTH]; // 64ä½ä¸‹ä¸º4MB
 		};
 
-		_node1* _root;		// »ùÊıÊ÷µÄÍ·
+		_node1* _root;		// åŸºæ•°æ ‘çš„å¤´
 
-		// Îª½áµã¿ª¿Õ¼ä
+		// ä¸ºç»“ç‚¹å¼€ç©ºé—´
 		template<typename T>
 		T* NewNode() {
 			static MemoryPool<T> _mp;
@@ -806,7 +814,6 @@ namespace MR_MemPoolToolKits {
 
 			PAGE_ID i1 = pgid >> (FIRST_LAYERNUM + LEAF_LAYERNUM);
 			PAGE_ID i2 = (pgid >> LEAF_LAYERNUM) & (FS_MAXLENTH - 1);
-			PAGE_ID i3 = pgid & (LEAF_LENGTH - 1);
 			if (_root->nodeval[i1] == nullptr) {
 				_root->nodeval[i1] = NewNode<_node2>();
 				assert(_root->nodeval[i1]);

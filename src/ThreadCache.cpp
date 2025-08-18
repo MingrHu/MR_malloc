@@ -1,4 +1,4 @@
-#include "ThreadCache.h"
+#include "include/ThreadCache.h"
 
 void* ThreadCache::Allocate(size_t pos,size_t size){
 
@@ -15,7 +15,7 @@ void ThreadCache::DeAllocate(void* obj, size_t pos){
 
 	// printf("Start to Cycle ThreadCache!");
 	_freelists[pos].headpush(obj);
-	// »ØÊÕ²ßÂÔ´ı¶¨
+	// å›æ”¶ç­–ç•¥å¾…å®š
 	if (_freelists[pos].GetRemainSize() > MAXSIZE) 
 		ReleaseFreeNode(pos, _freelists[pos].GetRemainSize());
 }
@@ -26,7 +26,7 @@ size_t ThreadCache::FetchFromCentralCache(void*& start,void*& end,size_t pos, si
 	size_t num = CheckSize(size) > _freelists[pos].GetFreq() 
 		? _freelists[pos].GetFreq(): CheckSize(size);
 	CentralCache::getInstance()->FetchRangeObj(start, end, num, size, pos);
-	// ÏòÏÂÒ»²ãÉêÇëÄÚ´æ¾ÍÔö¼Ófreq
+	// å‘ä¸‹ä¸€å±‚ç”³è¯·å†…å­˜å°±å¢åŠ freq
 	_freelists[pos].PlusFreq();
 	return num;
 }
@@ -37,6 +37,6 @@ void ThreadCache::ReleaseFreeNode(size_t pos, size_t num){
 	void* end = nullptr;
 	_freelists[pos].headRangePop(start, end, num);
 	CentralCache::getInstance()->ReleaseListToSpans(start, pos);
-	// ÏòÏÂÒ»²ã»¹¾Í¼õÉÙ
+	// å‘ä¸‹ä¸€å±‚è¿˜å°±å‡å°‘
 	_freelists[pos].SubFreq();
 }

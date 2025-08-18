@@ -5,8 +5,8 @@
 #include <atomic>
 #include <iomanip> 
 #include <fstream>
-#include"Common.h"
-#include"MR_malloc.h"
+#include"include/Common.h"
+#include"include/MR_malloc.h"
 #define SIZE 10000000
 typedef long long ll;
 using namespace std;
@@ -15,16 +15,16 @@ struct ListNode {
 	ListNode* next;
 };
 
-// ntimes Ò»ÂÖÉêÇëºÍÊÍ·ÅÄÚ´æµÄ´ÎÊı
-// rounds ÂÖ´Î
+// ntimes ä¸€è½®ç”³è¯·å’Œé‡Šæ”¾å†…å­˜çš„æ¬¡æ•°
+// rounds è½®æ¬¡
 void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds,vector<int>& test) {
 	vector<thread> vthread(nworks);
-	atomic<size_t> malloc_costtime = 0;
-	atomic<size_t> free_costtime = 0;
+	atomic<size_t> malloc_costtime(0);
+	atomic<size_t> free_costtime(0);
 
 	for (size_t k = 0; k < nworks; ++k) {
-		// Á¢¼´¿ªÊ¼Ö´ĞĞ
-		vthread[k] = thread([&, k]() {
+		// ç«‹å³å¼€å§‹æ‰§è¡Œ
+		vthread[k] = thread([&]() {
 			vector<void*> v;
 			v.reserve(ntimes);
 
@@ -56,36 +56,36 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds,vector<int>& te
 		t.join();
 	}
 
-	printf("ÏµÍ³×Ô´ømalloc²ßÂÔ£º%zu¸öÏß³Ì²¢·¢Ö´ĞĞ%zuÂÖ£¬Ã¿ÂÖÉêÇë¿Õ¼ä %zu´Î: »¨·Ñ£º%zu ms\n",
+	printf("ç³»ç»Ÿè‡ªå¸¦mallocç­–ç•¥ï¼š%zuä¸ªçº¿ç¨‹å¹¶å‘æ‰§è¡Œ%zuè½®ï¼Œæ¯è½®ç”³è¯·ç©ºé—´ %zuæ¬¡: èŠ±è´¹ï¼š%zu ms\n",
 		nworks, rounds, ntimes, malloc_costtime.load());
 
-	printf("ÏµÍ³×Ô´ømalloc²ßÂÔ£º%zu¸öÏß³Ì²¢·¢Ö´ĞĞ%zuÂÖ´Î£¬Ã¿ÂÖÊÍ·Å¿Õ¼ä %zu´Î: »¨·Ñ£º%zu ms\n",
+	printf("ç³»ç»Ÿè‡ªå¸¦mallocç­–ç•¥ï¼š%zuä¸ªçº¿ç¨‹å¹¶å‘æ‰§è¡Œ%zuè½®æ¬¡ï¼Œæ¯è½®é‡Šæ”¾ç©ºé—´ %zuæ¬¡: èŠ±è´¹ï¼š%zu ms\n",
 		nworks, rounds, ntimes, free_costtime.load());
 
-	printf("ÏµÍ³×Ô´ømalloc²ßÂÔ£º%zu¸öÏß³Ì²¢·¢malloc&free %zu´Î£¬×Ü¼Æ»¨·Ñ£º%zu ms\n",
+	printf("ç³»ç»Ÿè‡ªå¸¦mallocç­–ç•¥ï¼š%zuä¸ªçº¿ç¨‹å¹¶å‘malloc&free %zuæ¬¡ï¼Œæ€»è®¡èŠ±è´¹ï¼š%zu ms\n",
 		nworks, nworks * rounds * ntimes, malloc_costtime.load() + free_costtime.load());
 }
 
-// ntimes Ò»ÂÖÉêÇëºÍÊÍ·ÅÄÚ´æµÄ´ÎÊı
-// rounds ÂÖ´Î
-// µ¥ÂÖ´ÎÉêÇëÊÍ·Å´ÎÊı Ïß³ÌÊı ÂÖ´Î
+// ntimes ä¸€è½®ç”³è¯·å’Œé‡Šæ”¾å†…å­˜çš„æ¬¡æ•°
+// rounds è½®æ¬¡
+// å•è½®æ¬¡ç”³è¯·é‡Šæ”¾æ¬¡æ•° çº¿ç¨‹æ•° è½®æ¬¡
 void BenchmarkMR_malloc(size_t ntimes, size_t nworks, size_t rounds, vector<int>& test)
 {
 	std::vector<std::thread> vthread(nworks);
-	std::atomic<size_t> malloc_costtime = 0;
-	std::atomic<size_t> free_costtime = 0;
+	atomic<size_t> malloc_costtime(0);
+	atomic<size_t> free_costtime(0);
 	MR_malloc mp;
 
-	// Ã¿ÌõÏß³Ì
+	// æ¯æ¡çº¿ç¨‹
 	for (size_t k = 0; k < nworks; ++k)
 	{
-		vthread[k] = thread([&, k]() {
+		vthread[k] = thread([&]() {
 			vector<void*> v;
 			v.reserve(ntimes);
-			// Ã¿ÂÖ
+			// æ¯è½®
 			for (size_t j = 0; j < rounds; ++j) {
 				auto begin1 = chrono::high_resolution_clock::now();
-				// Ã¿´Î·ÖÅä
+				// æ¯æ¬¡åˆ†é…
 				for (size_t i = 0; i < ntimes; i++) {
 
 					v.push_back(mp.Allocate(test[i]));
@@ -93,7 +93,7 @@ void BenchmarkMR_malloc(size_t ntimes, size_t nworks, size_t rounds, vector<int>
 				auto end1 = chrono::high_resolution_clock::now();
 
 				auto begin2 = chrono::high_resolution_clock::now();
-				// Ã¿´ÎÊÍ·Å
+				// æ¯æ¬¡é‡Šæ”¾
 				for (size_t i = 0; i < ntimes; i++) {
 					mp.Dellocate(v[i], test[i]);
 				}
@@ -114,13 +114,13 @@ void BenchmarkMR_malloc(size_t ntimes, size_t nworks, size_t rounds, vector<int>
 		t.join();
 	}
 
-	printf("²ÉÓÃMR_malloc²ßÂÔ£º%u¸öÏß³Ì²¢·¢Ö´ĞĞ%uÂÖ£¬Ã¿ÂÖÉêÇë¿Õ¼ä %u´Î: »¨·Ñ£º%u ms\n",
+	printf("é‡‡ç”¨MR_mallocç­–ç•¥ï¼š%zuä¸ªçº¿ç¨‹å¹¶å‘æ‰§è¡Œ%zuè½®ï¼Œæ¯è½®ç”³è¯·ç©ºé—´ %zuæ¬¡: èŠ±è´¹ï¼š%zu ms\n",
 		nworks, rounds, ntimes, malloc_costtime.load());
 
-	printf("²ÉÓÃMR_malloc²ßÂÔ£º%u¸öÏß³Ì²¢·¢Ö´ĞĞ%uÂÖ£¬Ã¿ÂÖÊÍ·Å¿Õ¼ä %u´Î: »¨·Ñ£º%u ms\n",
+	printf("é‡‡ç”¨MR_mallocç­–ç•¥ï¼š%zuä¸ªçº¿ç¨‹å¹¶å‘æ‰§è¡Œ%zuè½®ï¼Œæ¯è½®é‡Šæ”¾ç©ºé—´ %zuæ¬¡: èŠ±è´¹ï¼š%zu ms\n",
 		nworks, rounds, ntimes, free_costtime.load());
 
-	printf("²ÉÓÃMR_malloc²ßÂÔ£º%u¸öÏß³Ì²¢·¢%u´Î£¬×Ü¼Æ»¨·Ñ£º%u ms\n",
+	printf("é‡‡ç”¨MR_mallocç­–ç•¥ï¼š%zuä¸ªçº¿ç¨‹å¹¶å‘%zuæ¬¡ï¼Œæ€»è®¡èŠ±è´¹ï¼š%zu ms\n",
 		nworks, nworks * rounds * ntimes, malloc_costtime.load() + free_costtime.load());
 }
 
@@ -128,21 +128,21 @@ int main() {
 #if 0
 	Timer t;
 
-	t.init(); // ³õÊ¼»¯¼ÆÊ±Æ÷µÄ¿ªÊ¼Ê±¼ä
+	t.init(); // åˆå§‹åŒ–è®¡æ—¶å™¨çš„å¼€å§‹æ—¶é—´
 	for (int i = 0; i < SIZE; i++) {
 		ListNode* node = (ListNode*)malloc(sizeof(ListNode));
 		node->next = nullptr;
 		free(node);
 	}
-	std::cout << "ÏµÍ³µ÷ÓÃmalloc·ÖÅä" << SIZE << "´ÎÄÚ´æËùÓÃÊ±¼äÎª£º" << t.elapsed() << "ms" << std::endl;
+	std::cout << "ç³»ç»Ÿè°ƒç”¨mallocåˆ†é…" << SIZE << "æ¬¡å†…å­˜æ‰€ç”¨æ—¶é—´ä¸ºï¼š" << t.elapsed() << "ms" << std::endl;
 
-	t.init(); // ³õÊ¼»¯¼ÆÊ±Æ÷µÄ¿ªÊ¼Ê±¼ä
+	t.init(); // åˆå§‹åŒ–è®¡æ—¶å™¨çš„å¼€å§‹æ—¶é—´
 	for (int i = 0; i < SIZE; i++) {
 		ListNode* node = new ListNode;
 		node->next = nullptr;
 		delete node;
 	}
-	std::cout << "ÏµÍ³µ÷ÓÃnew·ÖÅä" << SIZE << "´ÎÄÚ´æËùÓÃÊ±¼äÎª£º" << t.elapsed() << "ms" << std::endl;
+	std::cout << "ç³»ç»Ÿè°ƒç”¨newåˆ†é…" << SIZE << "æ¬¡å†…å­˜æ‰€ç”¨æ—¶é—´ä¸ºï¼š" << t.elapsed() << "ms" << std::endl;
 
 
 	MR_malloc<ListNode> mp;
@@ -152,9 +152,9 @@ int main() {
 		node->next = nullptr;
 		mp.Dellocate(node);
 	}
-	std::cout << "×Ô¶¨Òåmalloc·ÖÅä" << SIZE << "´ÎÄÚ´æËùÓÃÊ±¼äÎª£º" << t.elapsed() << "ms" << std::endl;
+	std::cout << "è‡ªå®šä¹‰mallocåˆ†é…" << SIZE << "æ¬¡å†…å­˜æ‰€ç”¨æ—¶é—´ä¸ºï¼š" << t.elapsed() << "ms" << std::endl;
 
-#elif 0 // ²âÊÔ¹¦ÄÜ¿éÊÇ·ñÕı³£
+#elif 0 // æµ‹è¯•åŠŸèƒ½å—æ˜¯å¦æ­£å¸¸
 	const size_t Size = 1024 * 256;
 	unordered_map<int, int> dic;
 	for (int i = 1; i <= Size; i++) {
@@ -169,10 +169,10 @@ int main() {
 	MR_malloc mp;
 	ofstream outFile("TestReport/memory_wastage_report.txt");
 	if (!outFile) {
-		cerr << "ÎŞ·¨´ò¿ªÊä³öÎÄ¼ş£¡" << endl;
+		cerr << "æ— æ³•æ‰“å¼€è¾“å‡ºæ–‡ä»¶ï¼" << endl;
 		return 1;
 	}
-	outFile << "ÇëÇó´óĞ¡" << "\t" << "·ÖÅä´óĞ¡" << "\t" << "Ğ¡¿éÄÚ´æËéÆ¬ÂÊ" << "\t" << "Ò³ÄÚ´æÄÚ²¿ËéÆ¬ÂÊ" << "\t" << "·ÖÅäÒ³¸öÊı" << endl;
+	outFile << "è¯·æ±‚å¤§å°" << "\t" << "åˆ†é…å¤§å°" << "\t" << "å°å—å†…å­˜ç¢ç‰‡ç‡" << "\t" << "é¡µå†…å­˜å†…éƒ¨ç¢ç‰‡ç‡" << "\t" << "åˆ†é…é¡µä¸ªæ•°" << endl;
 	for (int i = 1; i <= 256 * 1024; i++) {
 		size_t size = mp._CalRoundUp(i).first;
 		double per1 = ((double)size - (double)i) / (double)size * 100;
@@ -187,8 +187,8 @@ int main() {
 		if (MAX2 < per2)
 			MAX2 = per2, size2 = size, i2 = i;
 	}
-	cout << "Ğ¡¿éÄÚ´æ×î´óËéÆ¬ÂÊÎª£º" << MAX1 << "%" << " Ò³×î´óÄÚ²¿ËéÆ¬ÂÊÎª£º" << MAX2 << "%" << endl;
-	cout << "¶ÔÓ¦·ÖÅäÉêÇë´óĞ¡ºÍÊµ¼Ê´óĞ¡·Ö±ğÎª£º" << i1 << "-"<<size1<<" " << i2 << "-" << size2<< endl;
+	cout << "å°å—å†…å­˜æœ€å¤§ç¢ç‰‡ç‡ä¸ºï¼š" << MAX1 << "%" << " é¡µæœ€å¤§å†…éƒ¨ç¢ç‰‡ç‡ä¸ºï¼š" << MAX2 << "%" << endl;
+	cout << "å¯¹åº”åˆ†é…ç”³è¯·å¤§å°å’Œå®é™…å¤§å°åˆ†åˆ«ä¸ºï¼š" << i1 << "-"<<size1<<" " << i2 << "-" << size2<< endl;
 	return 0;
 
 
@@ -210,9 +210,9 @@ int main() {
 
 
 #elif 1
-	size_t n = 44399;
+	size_t n = 64399;
 	vector<int> nums(n, 0);
-	for (int i = 1; i < n; i++) {
+	for (size_t i = 1; i < n; i++) {
 		nums[i] = rand() % i;
 	}
 	cout << "==========================================================" << endl;

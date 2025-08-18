@@ -5,34 +5,34 @@
 #include "Common.h"
 #include "CentralCache.h"
 using namespace MR_MemPoolToolKits;
-// Ïß³Ì»º´æ
-// Ã¿¸öÏß³Ì¶ÀÏíµÄ
+// çº¿ç¨‹ç¼“å­˜
+// æ¯ä¸ªçº¿ç¨‹ç‹¬äº«çš„
 class ThreadCache {
 public:
 
 	ThreadCache() :_freelists() { };
 
-	// ÓÃ»§ÇëÇóµÄÄÚ´æ¿é´óĞ¡ size 
-	// ¶ÔÓ¦µÄÍ°Î»ÖÃpos
-	// ÓĞ¾ÍÖ±½Ó·µ»Ø Ã»ÓĞÔÙÏòÏÂÒ»²ãÄÃ
+	// ç”¨æˆ·è¯·æ±‚çš„å†…å­˜å—å¤§å° size 
+	// å¯¹åº”çš„æ¡¶ä½ç½®pos
+	// æœ‰å°±ç›´æ¥è¿”å› æ²¡æœ‰å†å‘ä¸‹ä¸€å±‚æ‹¿
 	void* Allocate(size_t pos,size_t size);
 
-	// »ØÊÕÓÃ»§µÄÄÚ´æ¿é
-	// ¹ı³¤Ôò·µ»¹¸øÏÂÒ»²ã
+	// å›æ”¶ç”¨æˆ·çš„å†…å­˜å—
+	// è¿‡é•¿åˆ™è¿”è¿˜ç»™ä¸‹ä¸€å±‚
 	void DeAllocate(void* obj, size_t pos);
 
 private:
 
-	// ´ÓÖĞĞÄ»º´æÖĞ»ñÈ¡ÄÚ´æ
+	// ä»ä¸­å¿ƒç¼“å­˜ä¸­è·å–å†…å­˜
 	size_t FetchFromCentralCache(void*& start,void*& end,size_t pos, size_t size);
 
-	// »ØÊÕÁ´±í ·µ»¹¸øÏÂÒ»²ã
+	// å›æ”¶é“¾è¡¨ è¿”è¿˜ç»™ä¸‹ä¸€å±‚
 	void ReleaseFreeNode(size_t pos,size_t num);
 
 	_FreeLists _freelists[FREELISTSIZE];
 };
-// ²ÉÓÃÖÇÄÜÖ¸Õë×Ô¶¯¹ÜÀíÏß³Ì¾Ö²¿±äÁ¿ÉúÃüÖÜÆÚ ×Ô¶¯µ÷ÓÃThreadCacheÎö¹¹
-static _declspec(thread) std::unique_ptr<ThreadCache> tls_threadcache = nullptr;
+// é‡‡ç”¨æ™ºèƒ½æŒ‡é’ˆè‡ªåŠ¨ç®¡ç†çº¿ç¨‹å±€éƒ¨å˜é‡ç”Ÿå‘½å‘¨æœŸ è‡ªåŠ¨è°ƒç”¨ThreadCacheææ„
+static thread_local std::unique_ptr<ThreadCache> tls_threadcache = nullptr;
 #endif // ! THREADCHACHE_H
 
 
