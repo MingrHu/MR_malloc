@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/BenchMark.dir/src/BenchMark.cpp.o -o bin/BenchMark  libmr_malloc_lib.a 
