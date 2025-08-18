@@ -210,7 +210,7 @@ int main() {
 
 
 #elif 1
-	size_t n = 64399;
+	size_t n = 14399;
 	vector<int> nums(n, 0);
 	for (size_t i = 1; i < n; i++) {
 		nums[i] = rand() % i;
