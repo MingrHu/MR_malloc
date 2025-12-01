@@ -13,7 +13,7 @@
 
 	#include <Windows.h>
 
-#else  //...Linux
+#else  //...Linux/MacOs
 
 	#include <sys/mman.h>
 	#include <unistd.h>	
@@ -21,20 +21,36 @@
 #endif
 
 #ifdef _WIN64
-	typedef unsigned long long PAGE_ID;	// 保证平台通用性
-	#define MR_SUP 5
-	#define MR_MALLOCBIT 64
+    typedef unsigned long long PAGE_ID;    // 保证平台通用性
+    #define MR_SUP 5
+    #define MR_MALLOCBIT 64
 #elif _WIN32
-	typedef size_t PAGE_ID;
-	#define MR_SUP 7
-	#define MR_MALLOCBIT 32
+    typedef size_t PAGE_ID;
+    #define MR_SUP 7
+    #define MR_MALLOCBIT 32
 #elif __linux__ && __x86_64__
-	typedef unsigned long long PAGE_ID;	// 保证平台通用性
-	#define MR_SUP 5
-	#define MR_LLMAX 9223372036854775807i64
-	#define MR_MALLOCBIT 64	
-	#define min(a,b)            (((a) < (b)) ? (a) : (b))
-#endif // !_WIN64
+    typedef unsigned long long PAGE_ID;    // 保证平台通用性
+    #define MR_SUP 5
+    #define MR_LLMAX 9223372036854775807i64
+    #define MR_MALLOCBIT 64    
+    #define min(a,b) (((a) < (b)) ? (a) : (b))
+#elif __APPLE__ && __MACH__               // macOS 检测
+    #include <TargetConditionals.h>
+    #if TARGET_OS_MAC && __x86_64__       // macOS on x86_64
+        typedef unsigned long long PAGE_ID;
+        #define MR_SUP 5
+        #define MR_LLMAX 9223372036854775807LL
+        #define MR_MALLOCBIT 64
+    #elif TARGET_OS_MAC && __arm64__      // macOS on ARM (Apple Silicon)
+        typedef unsigned long long PAGE_ID;
+        #define MR_SUP 5
+        #define MR_LLMAX 9223372036854775807LL
+        #define MR_MALLOCBIT 64
+    #endif
+    #define min(a,b) (((a) < (b)) ? (a) : (b))
+#else
+    #error "Unsupported platform!"
+#endif
 
 #define BYTES_BASE_SIZE 128		// 后续返回的实际分配大小是该值的倍数
 #define SPAN_MAXNUM 128			// SpanList的长度
