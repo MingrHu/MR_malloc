@@ -29,7 +29,7 @@
     #define MR_SUP 7
     #define MR_MALLOCBIT 32
 #elif __linux__ && __x86_64__
-    typedef unsigned long long PAGE_ID;    // 保证平台通用性
+    typedef unsigned long long PAGE_ID;    
     #define MR_SUP 5
     #define MR_LLMAX 9223372036854775807i64
     #define MR_MALLOCBIT 64    
@@ -190,9 +190,9 @@ namespace MR_MemPoolToolKits {
 	}
 
 
-	//直接去堆上申请按页申请空间
+	// 直接去堆上申请按页申请空间
 	// pagenum是申请的页个数
-	// 左移PAGE_SHIFT是申请8KB * 页数
+	// 左移PAGE_SHIFT是申请4KB * 页数
 	static inline void* SystemAlloc(size_t pagenum) {
 #ifdef _WIN32
 
@@ -250,6 +250,7 @@ namespace MR_MemPoolToolKits {
 		std::chrono::time_point<std::chrono::high_resolution_clock> _start;
 	};
 
+	// 自旋锁
 	class SpinLock {
 	public:
 

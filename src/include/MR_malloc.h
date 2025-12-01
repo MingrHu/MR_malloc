@@ -24,7 +24,7 @@
 #include "Common.h"
 #define DYNAMIC 1
 #define STATIC 0
-#define PRIVATE 0
+#define PRIVATE 1
 
 #if DYNAMIC
 	// 运行时确定
