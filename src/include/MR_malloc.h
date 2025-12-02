@@ -27,6 +27,9 @@
 #define PRIVATE 0
 
 #if DYNAMIC
+static constexpr int _predixSum[12] = {-1,15,23,31,39,47,55,63,71,79,87,95};
+static constexpr int _predixSize[12] = { 0,128,256,512,1024,2 * 1024,4 * 1024,8 * 1024,16 * 1024,32 * 1024,64 * 1024,128 * 1024 };
+
 	// 运行时确定
 	class MR_malloc {
 	public:
@@ -83,9 +86,6 @@
 				return { 8 * 1024,10 };
 			else return { 16 * 1024,11 };
 		}
-
-		static constexpr int _predixSum[12] = {-1,15,23,31,39,47,55,63,71,79,87,95};
-		static constexpr int _predixSize[12] = { 0,128,256,512,1024,2 * 1024,4 * 1024,8 * 1024,16 * 1024,32 * 1024,64 * 1024,128 * 1024 };
 		
 	};
 #elif STATIC
