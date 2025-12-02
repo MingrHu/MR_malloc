@@ -210,16 +210,18 @@ int main() {
 
 
 #elif 1
-	size_t n = 14399;
+	size_t n = 25000;
 	vector<int> nums(n, 0);
 	for (size_t i = 1; i < n; i++) {
 		nums[i] = rand() % i;
 	}
+	// bench-test:总共累计申请释放内存 25000 × 8 × 5 = 1000000次
+	// 内存使用量：最大峰值应该为 25000B × 8 / 1024 ≈ 192MB
 	cout << "==========================================================" << endl;
-	BenchmarkMalloc(n, 8, 10,nums);
+	BenchmarkMalloc(n, 8, 5,nums);
 
 	cout << "==========================================================" << endl;
-	BenchmarkMR_malloc(n, 8, 10,nums);
+	BenchmarkMR_malloc(n, 8, 5,nums);
 
 #endif
 	return 0;

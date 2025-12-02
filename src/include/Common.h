@@ -237,17 +237,17 @@ namespace MR_MemPoolToolKits {
 		Timer() = default;
 
 		void init() {
-			_start = std::chrono::high_resolution_clock::now();
+			_start = std::chrono::steady_clock::now();
 		}
 
 		long long elapsed() const {
-			auto end = std::chrono::high_resolution_clock::now();
+			auto end = std::chrono::steady_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - _start);
 			return duration.count();
 		}
 
 	private:
-		std::chrono::time_point<std::chrono::high_resolution_clock> _start;
+		std::chrono::time_point<std::chrono::steady_clock> _start;
 	};
 
 	// 自旋锁
@@ -260,23 +260,20 @@ namespace MR_MemPoolToolKits {
 		void Lock() {
 			retries = 0;
 			// memory_order_acquire 保证后续读操作能看见当前及之前的写操作
-			while (_flag.test_and_set(std::memory_order_acquire)) {
+			while (_flag.test_and_set()) {
 				backoff();
 				retries++;
 			}
 		}
 
 		void Unlock() {
-			// clear把_flag置为false 使用memory_order_release可以保证
-			// 后续读取的值都是基于修改之后的 让其他线程看到当前修改值
-			_flag.clear(std::memory_order_release);
+			_flag.clear();
 		}
 
 	private:
 
 		void backoff() {
 			if (retries <=( 1<< SPIN_LOCK_RETRYTIMES)) {
-				// 让出CPU 和timesleep区别在于避免不必要等待
 				std::this_thread::yield();
 			}
 			else {
@@ -297,7 +294,6 @@ namespace MR_MemPoolToolKits {
 	class _FreeLists {
 	public:
 
-		// 防止野指针
 		_FreeLists() {
 			_freelist_head = nullptr;
 			_size = 0;
@@ -330,7 +326,7 @@ namespace MR_MemPoolToolKits {
 
 			void* res = nullptr;
 			// 取二级指针的地址 
-			assert(_freelist_head);
+			assert(_freelist_head && "OOM!");
 			void* next = Next(_freelist_head);
 			res = _freelist_head;
 			_freelist_head = next;
@@ -596,7 +592,6 @@ namespace MR_MemPoolToolKits {
 			return (T*)_freelists[pos].headpop();
 		}
 
-
 		void DeAllocate(T* obj) {
 			assert(obj);
 			obj->~T();
@@ -617,7 +612,7 @@ namespace MR_MemPoolToolKits {
 		static constexpr size_t _memSize = GetSize<T>();
 
 		// 记录分配的大块内存起始地址 用于释放
-		std::vector<char*> _startrecord;
+		std::vector<void*> _startrecord;
 
 		size_t get_pos() const {
 			constexpr size_t _memSize = GetSize<T>();
@@ -631,7 +626,7 @@ namespace MR_MemPoolToolKits {
 			size_t total_chunk = n * num;
 			size_t pos = get_pos();
 			// 剩下的内存完美满足要求
-			if (_remain >= num * n) {
+			if (_remain >= total_chunk) {
 				res = _memstart;
 				_memstart += total_chunk;
 				_remain -= total_chunk;
@@ -669,7 +664,7 @@ namespace MR_MemPoolToolKits {
 						if (!_freelists[i].Empty()) {
 							_memstart = (char*)_freelists[i].headpop();
 							_remain += GetIndexSize(i);
-							// 进入alloc再次去修正num
+							// 递归进入alloc再次去修正num
 							return chunk_alloc(n, num, algin);
 						}
 					}
@@ -680,7 +675,7 @@ namespace MR_MemPoolToolKits {
 				// 记录给指针分配的地址 也即指针本身的地址
 				_startrecord.push_back(_memstart);
 				_remain += chunk;
-				// 此时应该获得了够多的chunk了 但需要返回一个合适的num用于freelists
+				// 此时应该获得了够多的chunk了 返回一个合适的num用于freelists
 				return chunk_alloc(n, num, algin);
 			}
 		}// chunk_alloc 
@@ -711,7 +706,9 @@ namespace MR_MemPoolToolKits {
 	};
 
 	// 三层基数树
-	// 64位下BITS = 64 
+	// 64位下BITS = 64 一个页4KB 那么总共有52位是用于确定页号的
+	// 从页表设计出发 如果任何一级PTE VPN都可以被一个页面所包含
+	// 对于每级的索引序号最大只能是4KB / 8 = 512 也就是9位
 	template<size_t BITS>
 	class RadixTree {
 	public:
@@ -826,7 +823,7 @@ namespace MR_MemPoolToolKits {
 			return new(mem) T();
 		}
 
-		// pgid = BITS>>PAGE_SHIFT
+		// pgid = BITS >> PAGE_SHIFT
 		void set(PAGE_ID pgid) {
 
 			PAGE_ID i1 = pgid >> (FIRST_LAYERNUM + LEAF_LAYERNUM);

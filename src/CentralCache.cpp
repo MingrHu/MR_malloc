@@ -58,7 +58,6 @@ void CentralCache::ReleaseListToSpans(void* start,size_t pos){
     _SpanLists[pos]._mtx.Lock();
     while (start) {
         // 根据内存地址得到所属的span对象
-        // 由于使用了哈希表 因此线程不安全 要加锁
         Span* span = PageCache::getInstance()->GetHashObjwithSpan(start);
         assert(span);
 
